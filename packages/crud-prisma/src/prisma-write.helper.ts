@@ -1,5 +1,5 @@
 import { CrudRequest } from '@nestjsx/crud';
-import { ParsedRequestParams, QueryFilter } from '@nestjsx/crud-request';
+import { ParsedRequestParams, QueryFilter, SCondition } from '@nestjsx/crud-request';
 
 import { PrismaCrudModelConfig, PrismaCrudWhereUniqueInput } from './interfaces/prisma-crud-model-config.interface';
 import { getPrismaCrudParams } from './prisma-crud.utils';
@@ -14,6 +14,23 @@ function isObject(value: unknown): value is PrismaCrudWritePayload {
 
 function getAuthPersist(parsed: ParsedRequestParams): PrismaCrudWritePayload {
   return isObject(parsed.authPersist) ? parsed.authPersist : {};
+}
+
+function getKnownScalarPayload<TModel = unknown>(
+  model: PrismaCrudModelConfig<TModel>,
+  payload?: PrismaCrudWritePayload,
+): PrismaCrudWritePayload {
+  if (!isObject(payload)) {
+    return {};
+  }
+
+  return model.scalarFields.reduce<PrismaCrudWritePayload>((data, field) => {
+    if (Object.prototype.hasOwnProperty.call(payload, field)) {
+      data[field] = payload[field];
+    }
+
+    return data;
+  }, {});
 }
 
 function getScalarEntityData<TModel = unknown>(
@@ -74,7 +91,14 @@ async function normalizeWritePayload<TModel = unknown, TPayload = Partial<TModel
   const hookName =
     mode === 'create' ? 'normalizeCreate' : mode === 'replace' ? 'normalizeReplace' : 'normalizeUpdate';
   const hook = model.write && model.write[hookName];
-  const initial = mergeWritePayload(mode, existingScalarData, dto, paramsFilter, {}, allowParamsOverride);
+  const initial = mergeWritePayload(
+    mode,
+    existingScalarData,
+    getKnownScalarPayload(model, dto),
+    paramsFilter,
+    {},
+    allowParamsOverride,
+  );
   const normalized = hook
     ? await hook({
         dto: initial,
@@ -116,12 +140,45 @@ function getEntityPrimaryLookup<TModel = unknown>(
   }, {});
 }
 
-function toPrimaryFilters(params: PrismaCrudWritePayload): QueryFilter[] {
-  return Object.keys(params).map((field) => ({
-    field,
-    operator: '$eq',
-    value: params[field],
+function mergePrimaryLookupIntoParamsFilter(
+  paramsFilter: QueryFilter[] = [],
+  primaryLookup: PrismaCrudWritePayload,
+): QueryFilter[] {
+  const merged = paramsFilter.map((filter) =>
+    Object.prototype.hasOwnProperty.call(primaryLookup, filter.field)
+      ? {
+          ...filter,
+          value: primaryLookup[filter.field],
+        }
+      : filter,
+  );
+  const knownFields = new Set(merged.map((filter) => filter.field));
+
+  Object.keys(primaryLookup).forEach((field) => {
+    if (!knownFields.has(field)) {
+      merged.push({
+        field,
+        operator: '$eq',
+        value: primaryLookup[field],
+      });
+    }
+  });
+
+  return merged;
+}
+
+function buildPrimaryLookupSearch(primaryLookup: PrismaCrudWritePayload): SCondition {
+  const conditions = Object.keys(primaryLookup).map((field) => ({
+    [field]: primaryLookup[field],
   }));
+
+  if (conditions.length === 1) {
+    return conditions[0];
+  }
+
+  return {
+    $and: conditions,
+  };
 }
 
 async function resolveMutationWhere<TModel = unknown>(
@@ -170,10 +227,12 @@ export function clonePrismaCrudRequestWithEntity<TModel = unknown>(
     ...req,
     parsed: {
       ...req.parsed,
-      search: undefined,
-      filter: [],
-      or: [],
-      paramsFilter: toPrimaryFilters(primaryLookup),
+      search: req.parsed.search
+        ? {
+            $and: [req.parsed.search, buildPrimaryLookupSearch(primaryLookup)],
+          }
+        : req.parsed.search,
+      paramsFilter: mergePrimaryLookupIntoParamsFilter(req.parsed.paramsFilter, primaryLookup),
     },
   };
 }

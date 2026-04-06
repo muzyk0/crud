@@ -7,7 +7,7 @@ import {
   assertPrismaCrudDelegate,
   assertPrismaCrudDelegateMethod,
   buildPrismaCrudCountArgs,
-  hasPrismaCrudPrimaryParams,
+  hasOnlyPrismaCrudPrimaryParams,
   mergePrismaCrudOptions,
   PrismaCrudCountArgs,
   PrismaCrudDelegate,
@@ -253,7 +253,7 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
       return undefined;
     }
 
-    if (!hasPrismaCrudPrimaryParams(parsed, options.model)) {
+    if (!hasOnlyPrismaCrudPrimaryParams(parsed, options.model)) {
       return undefined;
     }
 

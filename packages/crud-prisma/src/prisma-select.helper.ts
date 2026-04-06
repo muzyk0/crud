@@ -89,6 +89,15 @@ export function ensurePrismaRelationSelection(select: PrismaCrudSelect, relation
   return relationSelection;
 }
 
+export function getPrismaRelationSelection(
+  select: PrismaCrudSelect,
+  relationName: string,
+): PrismaCrudRelationSelection | undefined {
+  const current = select[relationName];
+
+  return isRelationSelection(current) ? current : undefined;
+}
+
 export function mergePrismaSelect(target: PrismaCrudSelect, source: PrismaCrudSelect): PrismaCrudSelect {
   Object.entries(source).forEach(([field, value]) => {
     const current = target[field];

@@ -288,6 +288,108 @@ describe('#crud-prisma', () => {
       expect(result.cache.key).toContain('"model":"User"');
     });
 
+    it('should keep descendant-only parent joins on primary keys when the parent join is not selected', () => {
+      const parsed = parseQuery((qb) =>
+        qb
+          .setJoin({ field: 'company' })
+          .setJoin({ field: 'company.projects', select: ['name'] }),
+      );
+
+      const result = mapCrudRequestToPrisma(parsed, {
+        model: getUserModelConfig(),
+        query: {
+          join: {
+            company: {
+              select: false,
+            },
+            'company.projects': {},
+          },
+        },
+      });
+
+      expect(result.args.select).toEqual({
+        id: true,
+        name: true,
+        email: true,
+        tenantId: true,
+        deletedAt: true,
+        company: {
+          select: {
+            id: true,
+            projects: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      });
+    });
+
+    it('should require an active relation selection for many-side nested sorting', () => {
+      const parsed = parseQuery((qb) => qb.sortBy({ field: 'licenses.id', order: 'DESC' }));
+
+      expect(() =>
+        mapCrudRequestToPrisma(parsed, {
+          model: getUserModelConfig(),
+          query: {
+            join: {
+              licenses: {},
+            },
+          },
+        }),
+      ).toThrow('requires an active relation selection');
+    });
+
+    it('should reject ambiguous implicit short aliases for joined relations', () => {
+      const parsed = parseQuery((qb) => qb.setJoin({ field: 'company.owner' }).setJoin({ field: 'profile.owner' }));
+      const model: PrismaCrudModelConfig = {
+        modelName: 'User',
+        scalarFields: ['id'],
+        primaryKeys: ['id'],
+        relationMap: {
+          company: {
+            type: 'one',
+            scalarFields: ['id'],
+            primaryKeys: ['id'],
+            relationMap: {
+              owner: {
+                type: 'one',
+                scalarFields: ['id', 'name'],
+                primaryKeys: ['id'],
+              },
+            },
+          },
+          profile: {
+            type: 'one',
+            scalarFields: ['id'],
+            primaryKeys: ['id'],
+            relationMap: {
+              owner: {
+                type: 'one',
+                scalarFields: ['id', 'name'],
+                primaryKeys: ['id'],
+              },
+            },
+          },
+        },
+        whereUnique: (params) => ({ id: params.id }),
+      };
+
+      expect(() =>
+        mapCrudRequestToPrisma(parsed, {
+          model,
+          query: {
+            join: {
+              'company.owner': {},
+              'profile.owner': {},
+            },
+          },
+        }),
+      ).toThrow('join alias "owner" is ambiguous');
+    });
+
     it('should keep cache as a no-op without an extension hook and omit soft-delete filters when includeDeleted is set', () => {
       const parsed = parseQuery((qb) =>
         qb.setJoin({ field: 'company' }).sortBy({ field: 'company.id', order: 'DESC' }).setIncludeDeleted(1),

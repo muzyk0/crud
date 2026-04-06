@@ -8,11 +8,11 @@ import {
 } from './interfaces/prisma-crud-options.interface';
 import { buildPrismaIncludePlan, resolvePrismaField } from './prisma-include.helper';
 import {
+  getPrismaRelationSelection,
   PrismaCrudOrderBy,
   PrismaCrudRelationSelection,
   PrismaCrudSelect,
   buildPrismaScalarSelect,
-  ensurePrismaRelationSelection,
   mergePrismaSelect,
 } from './prisma-select.helper';
 import { buildPrismaWhere, PrismaCrudWhere } from './prisma-where.helper';
@@ -69,7 +69,7 @@ function buildNestedOrderBy(relationPath: string[], field: string, direction: Qu
   return orderBy as PrismaCrudOrderBy;
 }
 
-function ensureNestedRelationSelection(
+function getNestedRelationSelection(
   select: PrismaCrudSelect,
   relationPath: string[],
 ): PrismaCrudRelationSelection | undefined {
@@ -81,7 +81,12 @@ function ensureNestedRelationSelection(
   let currentRelationSelection: PrismaCrudRelationSelection;
 
   relationPath.forEach((relation) => {
-    currentRelationSelection = ensurePrismaRelationSelection(currentSelect, relation);
+    currentRelationSelection = getPrismaRelationSelection(currentSelect, relation);
+
+    if (!currentRelationSelection) {
+      return;
+    }
+
     currentSelect = currentRelationSelection.select;
   });
 
@@ -101,7 +106,7 @@ function applySort(
     const lastRelationType = relationTypes[relationTypes.length - 1];
 
     if (lastRelationType === 'many') {
-      const relationSelection = ensureNestedRelationSelection(select, resolvedField.relationPath);
+      const relationSelection = getNestedRelationSelection(select, resolvedField.relationPath);
 
       if (!relationSelection) {
         throw new Error(`crud-prisma: sort path "${sortField.field}" requires an active relation selection`);

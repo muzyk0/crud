@@ -49,6 +49,16 @@ function normalizeJoin(join?: QueryJoin, field?: string): QueryJoin {
   return join || { field };
 }
 
+function registerAlias(aliases: Record<string, string>, alias: string, path: string): void {
+  const existingPath = aliases[alias];
+
+  if (existingPath && existingPath !== path) {
+    throw new Error(`crud-prisma: join alias "${alias}" is ambiguous between "${existingPath}" and "${path}"`);
+  }
+
+  aliases[alias] = path;
+}
+
 export function resolvePrismaRelationPath(
   model: PrismaCrudModelConfig,
   path: string,
@@ -193,7 +203,6 @@ export function buildPrismaIncludePlan(
   const select: PrismaCrudSelect = {};
   const relationNodes = new Map<string, PrismaCrudRelationSelection>();
   const aliases: Record<string, string> = {};
-  const selectedJoinPaths = new Set(activeJoins.filter((join) => join.selected).map((join) => join.path));
 
   activeJoins.forEach((activeJoin) => {
     const { path, pathSegments, relationChain, relation, options, join } = activeJoin;
@@ -203,17 +212,19 @@ export function buildPrismaIncludePlan(
     const shouldMaterialize = activeJoin.selected || hasSelectedDescendant;
 
     if (options.alias) {
-      aliases[options.alias] = path;
+      registerAlias(aliases, options.alias, path);
     }
 
     if (relation.alias) {
-      aliases[relation.alias] = path;
+      registerAlias(aliases, relation.alias, path);
     }
 
     const shortAlias = pathSegments[pathSegments.length - 1];
 
     if (!aliases[shortAlias]) {
-      aliases[shortAlias] = path;
+      registerAlias(aliases, shortAlias, path);
+    } else if (aliases[shortAlias] !== path) {
+      throw new Error(`crud-prisma: join alias "${shortAlias}" is ambiguous between "${aliases[shortAlias]}" and "${path}"`);
     }
 
     if (!shouldMaterialize) {
@@ -242,12 +253,11 @@ export function buildPrismaIncludePlan(
       return;
     }
 
-    mergePrismaSelect(
-      leafSelection.select,
-      buildPrismaScalarSelect(join.select, relation.scalarFields, relation.primaryKeys, options),
-    );
-
-    if (selectedJoinPaths.has(path)) {
+    if (activeJoin.selected) {
+      mergePrismaSelect(
+        leafSelection.select,
+        buildPrismaScalarSelect(join.select, relation.scalarFields, relation.primaryKeys, options),
+      );
       mergePrismaSelect(leafSelection.select, buildPrimaryKeyRelationSelect(relation));
     }
   });

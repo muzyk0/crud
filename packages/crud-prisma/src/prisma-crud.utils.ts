@@ -142,6 +142,16 @@ export function hasPrismaCrudPrimaryParams<TModel = unknown>(
   return Object.keys(getPrismaCrudPrimaryParams(parsed, model)).length === model.primaryKeys.length;
 }
 
+export function hasOnlyPrismaCrudPrimaryParams<TModel = unknown>(
+  parsed: ParsedRequestParams,
+  model: PrismaCrudModelConfig<TModel>,
+): boolean {
+  const params = getPrismaCrudParams(parsed);
+  const keys = Object.keys(params);
+
+  return keys.length === model.primaryKeys.length && keys.every((key) => model.primaryKeys.includes(key));
+}
+
 export function buildPrismaCrudCountArgs(where?: PrismaCrudWhere): PrismaCrudCountArgs | undefined {
   return where ? { where } : undefined;
 }

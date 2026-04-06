@@ -124,7 +124,7 @@ describe('#crud-prisma', () => {
       };
 
       delegate.create.mockResolvedValue(created);
-      delegate.findUnique.mockResolvedValue(refetched);
+      delegate.findFirst.mockResolvedValue(refetched);
 
       await expect(
         service.createOne(
@@ -157,10 +157,7 @@ describe('#crud-prisma', () => {
           },
         },
       });
-      expect(delegate.findUnique).toHaveBeenCalledWith({
-        where: {
-          id: 7,
-        },
+      expect(delegate.findFirst).toHaveBeenCalledWith({
         select: {
           id: true,
           name: true,
@@ -173,6 +170,20 @@ describe('#crud-prisma', () => {
               name: true,
             },
           },
+        },
+        where: {
+          AND: [
+            {
+              companyId: {
+                equals: 10,
+              },
+            },
+            {
+              id: {
+                equals: 7,
+              },
+            },
+          ],
         },
       });
     });
@@ -211,6 +222,58 @@ describe('#crud-prisma', () => {
 
       expect(delegate.findUnique).not.toHaveBeenCalled();
       expect(delegate.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('should drop unsupported nested write payloads unless a write hook adds them', async () => {
+      const delegate = createDelegate();
+      const service = new PrismaCrudService(delegate, {
+        model: getUserModelConfig(),
+      });
+      const created = {
+        id: 12,
+        name: 'Scalar Only',
+        email: 'scalar@email.com',
+        companyId: 4,
+        deletedAt: null,
+      };
+
+      delegate.create.mockResolvedValue(created);
+
+      await expect(
+        service.createOne(
+          createRequest(createParsed(), {
+            routes: {
+              createOneBase: {
+                returnShallow: true,
+              },
+            },
+          }),
+          {
+            name: 'Scalar Only',
+            email: 'scalar@email.com',
+            companyId: 4,
+            company: {
+              connect: {
+                id: 4,
+              },
+            },
+            profile: {
+              create: {
+                nickname: 'should-not-pass-through',
+              },
+            },
+            ignored: 'value',
+          } as any,
+        ),
+      ).resolves.toEqual(created);
+
+      expect(delegate.create).toHaveBeenCalledWith({
+        data: {
+          name: 'Scalar Only',
+          email: 'scalar@email.com',
+          companyId: 4,
+        },
+      });
     });
 
     it('should reject empty bulk payloads for createMany', async () => {
@@ -259,7 +322,7 @@ describe('#crud-prisma', () => {
       });
     });
 
-    it('should use a two-step lookup for updateOne and preserve params/auth fields', async () => {
+    it('should use a scoped two-step lookup for updateOne and refetch inside the original scope', async () => {
       const delegate = createDelegate();
       const service = new PrismaCrudService(delegate, {
         model: getUserModelConfig(),
@@ -267,9 +330,7 @@ describe('#crud-prisma', () => {
       const parsed = createParsed({
         paramsFilter: [{ field: 'companyId', operator: '$eq', value: 1 }],
         search: {
-          email: {
-            $eqL: 'current@email.com',
-          },
+          companyId: 1,
         },
         authPersist: {
           email: 'auth@email.com',
@@ -297,7 +358,7 @@ describe('#crud-prisma', () => {
 
       delegate.findFirst.mockResolvedValueOnce(found);
       delegate.update.mockResolvedValue(updated);
-      delegate.findUnique.mockResolvedValue(refetched);
+      delegate.findFirst.mockResolvedValueOnce(refetched);
 
       await expect(
         service.updateOne(
@@ -318,7 +379,7 @@ describe('#crud-prisma', () => {
         ),
       ).resolves.toEqual(refetched);
 
-      expect(delegate.findFirst).toHaveBeenCalledTimes(1);
+      expect(delegate.findFirst).toHaveBeenCalledTimes(2);
       expect(delegate.update).toHaveBeenCalledWith({
         where: {
           id: 3,
@@ -331,10 +392,7 @@ describe('#crud-prisma', () => {
           deletedAt: null,
         },
       });
-      expect(delegate.findUnique).toHaveBeenCalledWith({
-        where: {
-          id: 3,
-        },
+      expect(delegate.findFirst).toHaveBeenLastCalledWith({
         select: {
           id: true,
           name: true,
@@ -347,6 +405,20 @@ describe('#crud-prisma', () => {
               name: true,
             },
           },
+        },
+        where: {
+          AND: [
+            {
+              companyId: {
+                equals: 1,
+              },
+            },
+            {
+              id: {
+                equals: 3,
+              },
+            },
+          ],
         },
       });
     });
@@ -374,7 +446,7 @@ describe('#crud-prisma', () => {
         companyId: 9,
       };
 
-      delegate.findUnique.mockResolvedValue(found);
+      delegate.findFirst.mockResolvedValue(found);
       delegate.update.mockResolvedValue(updated);
 
       await expect(
@@ -405,7 +477,7 @@ describe('#crud-prisma', () => {
           deletedAt: null,
         },
       });
-      expect(delegate.findFirst).not.toHaveBeenCalled();
+      expect(delegate.findUnique).not.toHaveBeenCalled();
     });
 
     it('should create a new entity during replaceOne when the target is missing', async () => {
@@ -473,7 +545,7 @@ describe('#crud-prisma', () => {
         name: 'After Replace',
       };
 
-      delegate.findUnique.mockResolvedValue(found);
+      delegate.findFirst.mockResolvedValue(found);
       delegate.update.mockResolvedValue(replaced);
 
       await expect(
@@ -503,6 +575,86 @@ describe('#crud-prisma', () => {
           email: 'before@email.com',
           companyId: 22,
           deletedAt: null,
+        },
+      });
+      expect(delegate.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('should refetch replaceOne updates when returnShallow is disabled', async () => {
+      const delegate = createDelegate();
+      const service = new PrismaCrudService(delegate, {
+        model: getUserModelConfig(),
+      });
+      const parsed = createParsed({
+        paramsFilter: [{ field: 'id', operator: '$eq', value: 21 }],
+      });
+      const found = {
+        id: 21,
+        name: 'Before Replace',
+        email: 'before@email.com',
+        companyId: 2,
+        deletedAt: null,
+      };
+      const replaced = {
+        ...found,
+        name: 'After Replace',
+      };
+      const refetched = {
+        ...replaced,
+        company: {
+          id: 2,
+          name: 'After Replace Co',
+        },
+      };
+
+      delegate.findUnique.mockResolvedValueOnce(found).mockResolvedValueOnce(refetched);
+      delegate.update.mockResolvedValue(replaced);
+
+      await expect(
+        service.replaceOne(
+          createRequest(parsed, {
+            query: {
+              join: {
+                company: {
+                  eager: true,
+                },
+              },
+            },
+          }),
+          {
+            name: 'After Replace',
+          },
+        ),
+      ).resolves.toEqual(refetched);
+
+      expect(delegate.update).toHaveBeenCalledWith({
+        where: {
+          id: 21,
+        },
+        data: {
+          id: 21,
+          name: 'After Replace',
+          email: 'before@email.com',
+          companyId: 2,
+          deletedAt: null,
+        },
+      });
+      expect(delegate.findUnique).toHaveBeenLastCalledWith({
+        where: {
+          id: 21,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          companyId: true,
+          deletedAt: true,
+          company: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       });
     });

@@ -33,6 +33,7 @@ Known non-goals:
 Notes:
 
 - Request-level cache settings are a no-op by default and only become active when PrismaCrudOptions.cache is provided.
+- When PrismaCrudOptions.cache is enabled, expose `get(key)` and/or `set(key, value, ttl)` so the adapter can wrap normalized Prisma args with request-scoped cache reads and writes.
 - Join aliases remain compatibility metadata only and do not drive Prisma query generation.
 - Soft delete behavior must be declared through softDelete config rather than ORM-specific decorators.
 
@@ -165,6 +166,18 @@ export const userModel = definePrismaCrudModelConfig<User>({
 ```
 
 Use `relationMap` for `join`, nested `join`, eager relations, required joins, and nested sorting. Use `whereUnique` for single-key and compound-key lookups. Use `write` hooks only when Prisma needs explicit nested write normalization; they are the supported replacement for inferred TypeORM cascades.
+
+## Route response flags
+
+`PrismaCrudService` honors the route-level response flags from `@nestjsx/crud`:
+
+- `routes.createOneBase.returnShallow`
+- `routes.updateOneBase.returnShallow`
+- `routes.replaceOneBase.returnShallow`
+- `routes.deleteOneBase.returnDeleted`
+- `routes.recoverOneBase.returnRecovered`
+
+When these flags are unset, the service refetches the entity inside the current request scope when it can resolve a primary-key lookup.
 
 ## Migration from @nestjsx/crud-typeorm
 

@@ -118,7 +118,13 @@ describe('#crud-prisma', () => {
       const service = new PrismaCrudService(delegate, {
         model: getUserModelConfig(),
       });
-      const parsed = parseQuery((qb) => qb.setLimit(2).setPage(2).sortBy({ field: 'name', order: 'ASC' }));
+      const parsed = parseQuery((qb) =>
+        qb
+          .setFilter({ field: 'tenantId', operator: 'eq', value: 10 })
+          .setLimit(2)
+          .setPage(2)
+          .sortBy({ field: 'name', order: 'ASC' }),
+      );
       const data = [
         { id: 3, name: 'User 3', email: '3@email.com', tenantId: 10, deletedAt: null },
         { id: 4, name: 'User 4', email: '4@email.com', tenantId: 10, deletedAt: null },
@@ -154,8 +160,19 @@ describe('#crud-prisma', () => {
         orderBy: [{ name: 'asc' }],
         take: 2,
         skip: 2,
+        where: {
+          tenantId: {
+            equals: 10,
+          },
+        },
       });
-      expect(delegate.count).toHaveBeenCalledWith(undefined);
+      expect(delegate.count).toHaveBeenCalledWith({
+        where: {
+          tenantId: {
+            equals: 10,
+          },
+        },
+      });
     });
 
     it('should map includeDeleted, eager relations, and required joins for getOne', async () => {
@@ -267,6 +284,53 @@ describe('#crud-prisma', () => {
         },
       });
       expect(delegate.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('should avoid findUnique when route params include non-primary scope fields', async () => {
+      const delegate = createDelegate();
+      const service = new PrismaCrudService(delegate, {
+        model: getUserModelConfig(),
+      });
+      const parsed = parseQuery((qb) => qb.select(['name']));
+
+      parsed.paramsFilter = [
+        { field: 'tenantId', operator: '$eq', value: 7 },
+        { field: 'id', operator: '$eq', value: 9 },
+      ];
+      delegate.findFirst.mockResolvedValue({
+        id: 9,
+        name: 'Scoped User',
+        email: 'scoped@email.com',
+        tenantId: 7,
+        deletedAt: null,
+      });
+
+      await expect(service.getOne(createRequest(parsed))).resolves.toMatchObject({
+        id: 9,
+        name: 'Scoped User',
+      });
+
+      expect(delegate.findUnique).not.toHaveBeenCalled();
+      expect(delegate.findFirst).toHaveBeenCalledWith({
+        select: {
+          id: true,
+          name: true,
+        },
+        where: {
+          AND: [
+            {
+              tenantId: {
+                equals: 7,
+              },
+            },
+            {
+              id: {
+                equals: 9,
+              },
+            },
+          ],
+        },
+      });
     });
 
     it('should preserve not-found semantics for getOne', async () => {

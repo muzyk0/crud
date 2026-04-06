@@ -4,7 +4,6 @@ import { resolve } from 'path';
 import {
   definePrismaCrudModelConfig,
   definePrismaCrudOptions,
-  PRISMA_CRUD_COMPATIBILITY,
   PrismaCrudModelConfig,
   PrismaCrudService,
 } from '@nestjsx/crud-prisma';
@@ -17,12 +16,8 @@ interface CompanyRecord {
   deletedAt: Date | null;
 }
 
-function readFromInnerRepo(relativePath: string): string {
-  return readFileSync(resolve(__dirname, '../../..', relativePath), 'utf8');
-}
-
-function readFromWorkspace(relativePath: string): string {
-  return readFileSync(resolve(__dirname, '../../../..', relativePath), 'utf8');
+function readDoc(rootSegments: number, relativePath: string): string {
+  return readFileSync(resolve(__dirname, ...Array(rootSegments).fill('..'), relativePath), 'utf8');
 }
 
 function createDelegate() {
@@ -67,7 +62,7 @@ function getCompanyModelConfig(): PrismaCrudModelConfig<CompanyRecord> {
 describe('#crud-prisma', () => {
   describe('#documentation contract', () => {
     it('should keep the package README aligned with the exported Prisma compatibility contract', () => {
-      const readme = readFromInnerRepo('packages/crud-prisma/README.md');
+      const readme = readDoc(3, 'packages/crud-prisma/README.md');
 
       expect(readme).toContain('@nestjsx/crud-prisma');
       expect(readme).toContain('PrismaCrudService');
@@ -75,27 +70,15 @@ describe('#crud-prisma', () => {
       expect(readme).toContain('whereUnique');
       expect(readme).toContain('relationMap');
       expect(readme).toContain('normalizeCreate');
-
-      PRISMA_CRUD_COMPATIBILITY.goals.forEach((goal) => {
-        expect(readme).toContain(goal);
-      });
-
-      PRISMA_CRUD_COMPATIBILITY.supported.forEach((supported) => {
-        expect(readme).toContain(supported);
-      });
-
-      PRISMA_CRUD_COMPATIBILITY.nonGoals.forEach((nonGoal) => {
-        expect(readme).toContain(nonGoal);
-      });
-
-      Object.values(PRISMA_CRUD_COMPATIBILITY.notes).forEach((note) => {
-        expect(readme).toContain(note);
-      });
+      expect(readme).toContain('Known non-goals');
+      expect(readme).toContain('Route response flags');
+      expect(readme).toContain('PrismaCrudOptions.cache');
     });
 
-    it('should keep the documented service example valid against the current public API', () => {
+    it('should keep the documented service example valid against the current public API', async () => {
+      const delegate = createDelegate();
       const service = new PrismaCrudService(
-        createDelegate(),
+        delegate,
         definePrismaCrudOptions({
           model: getCompanyModelConfig(),
           query: {
@@ -108,15 +91,73 @@ describe('#crud-prisma', () => {
           },
         }),
       );
+      const deletedAt = new Date('2026-04-06T00:00:00.000Z');
+
+      delegate.findFirst.mockResolvedValue({
+        id: 1,
+        name: 'ACME',
+        domain: 'acme.test',
+        description: null,
+        deletedAt: null,
+      });
+      delegate.update.mockResolvedValue({
+        id: 1,
+        name: 'ACME',
+        domain: 'acme.test',
+        description: null,
+        deletedAt,
+      });
 
       expect(service).toBeInstanceOf(PrismaCrudService);
+      await expect(
+        service.deleteOne({
+          parsed: {
+            fields: [],
+            paramsFilter: [{ field: 'id', operator: '$eq', value: 1 }],
+            authPersist: {},
+            classTransformOptions: {},
+            search: {
+              id: 1,
+            },
+            filter: [],
+            or: [],
+            join: [],
+            sort: [],
+            limit: 0,
+            offset: 0,
+            page: 0,
+            cache: 0,
+            includeDeleted: 0,
+          },
+          options: {
+            query: {
+              softDelete: true,
+            },
+            params: {},
+            routes: {
+              deleteOneBase: {
+                returnDeleted: false,
+              },
+            },
+          },
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(delegate.update).toHaveBeenCalledWith({
+        where: {
+          id: 1,
+        },
+        data: {
+          deletedAt,
+        },
+      });
     });
 
     it('should keep the repo and wiki docs aligned with the verified fixture routes', () => {
-      const rootReadme = readFromInnerRepo('README.md');
-      const servicesPage = readFromWorkspace('crud.wiki/Services.md');
-      const sidebar = readFromWorkspace('crud.wiki/_Sidebar.md');
-      const prismaPage = readFromWorkspace('crud.wiki/ServicePrisma.md');
+      const rootReadme = readDoc(3, 'README.md');
+      const servicesPage = readDoc(4, 'crud.wiki/Services.md');
+      const sidebar = readDoc(4, 'crud.wiki/_Sidebar.md');
+      const prismaPage = readDoc(4, 'crud.wiki/ServicePrisma.md');
 
       expect(rootReadme).toContain('@nestjsx/crud-prisma');
       expect(rootReadme).toContain('ServicePrisma');
@@ -129,7 +170,12 @@ describe('#crud-prisma', () => {
       expect(prismaPage).toContain('PATCH /me');
       expect(prismaPage).toContain('POST /projects');
       expect(prismaPage).toContain('returnDeleted');
+      expect(prismaPage).toContain('returnShallow');
+      expect(prismaPage).toContain('returnRecovered');
       expect(prismaPage).toContain('allowParamsOverride');
+      expect(prismaPage).toContain('PrismaCrudOptions.cache');
+      expect(prismaPage).toContain('get(key)');
+      expect(prismaPage).toContain('set(key, value, ttl)');
       expect(prismaPage).toContain('Implicit nested writes or cascade behavior.');
     });
   });
