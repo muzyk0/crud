@@ -2,7 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { CreateManyDto, CrudRequest, CrudService, GetManyDefaultResponse } from '@nestjsx/crud';
 import { ParsedRequestParams } from '@nestjsx/crud-request';
 
-import { mapCrudRequestToPrisma, PrismaCrudQueryArgs } from './prisma-query.mapper';
+import { mapCrudRequestToPrisma, PrismaCrudCachePlan, PrismaCrudQueryArgs } from './prisma-query.mapper';
 import {
   assertPrismaCrudDelegate,
   assertPrismaCrudDelegateMethod,
@@ -43,9 +43,10 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
 
   public async getMany(req: CrudRequest): Promise<GetManyDefaultResponse<T> | T[]> {
     const options = this.getRequestOptions(req);
-    const { args } = mapCrudRequestToPrisma(req.parsed, options);
+    const { args, cache } = mapCrudRequestToPrisma(req.parsed, options);
+    const cacheScope = this.decidePagination(req.parsed, options) ? 'many:page' : 'many:list';
 
-    return this.doGetMany(args, req.parsed, options);
+    return this.resolveCachedResult(cache, cacheScope, () => this.doGetMany(args, req.parsed, options));
   }
 
   public async getOne(req: CrudRequest): Promise<T> {
@@ -168,11 +169,12 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
 
   public async deleteOne(req: CrudRequest): Promise<void | T> {
     const options = this.getRequestOptions(req);
+    const returnDeleted = !!(options.routes.deleteOneBase && options.routes.deleteOneBase.returnDeleted);
     const update = options.query.softDelete ? assertPrismaCrudDelegateMethod(this.delegate, 'update') : undefined;
     const remove = !options.query.softDelete ? assertPrismaCrudDelegateMethod(this.delegate, 'delete') : undefined;
-    const found = await this.getOneOrFail(req);
+    const found = await this.getOneOrFail(req, returnDeleted);
     const where = await buildPrismaCrudDeleteWhere(options.model, req.parsed, found);
-    const toReturn = options.routes.deleteOneBase && options.routes.deleteOneBase.returnDeleted ? found : undefined;
+    const toReturn = returnDeleted ? found : undefined;
 
     if (options.query.softDelete) {
       await update({
@@ -217,9 +219,11 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
   protected async getOneOrFail(req: CrudRequest, includeDeleted = false): Promise<T> {
     const options = this.getRequestOptions(req);
     const parsed = includeDeleted ? { ...req.parsed, includeDeleted: 1 } : req.parsed;
-    const { args } = mapCrudRequestToPrisma(parsed, options);
+    const { args, cache } = mapCrudRequestToPrisma(parsed, options);
     const uniqueArgs = this.getUniqueLookupArgs(parsed, args, options);
-    const found = uniqueArgs ? await this.delegate.findUnique(uniqueArgs) : await this.findOne(args);
+    const found = await this.resolveCachedResult(cache, 'one', () =>
+      uniqueArgs ? this.delegate.findUnique(uniqueArgs) : this.findOne(args),
+    );
 
     if (!found) {
       this.throwNotFoundException(options.model.modelName);
@@ -230,6 +234,34 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
 
   protected getRequestOptions(req: CrudRequest): PrismaCrudOptions<T, TCreate, TUpdate> {
     return mergePrismaCrudOptions(this.serviceOptions, req && req.options ? req.options : {});
+  }
+
+  protected async resolveCachedResult<TResult>(
+    cache: PrismaCrudCachePlan,
+    scope: string,
+    loader: () => Promise<TResult>,
+  ): Promise<TResult> {
+    if (!cache.enabled || !cache.extension || !cache.key) {
+      return loader();
+    }
+
+    const key = `${cache.key}:${scope}`;
+
+    if (typeof cache.extension.get === 'function') {
+      const cached = await cache.extension.get(key);
+
+      if (typeof cached !== 'undefined') {
+        return cached as TResult;
+      }
+    }
+
+    const result = await loader();
+
+    if (typeof cache.extension.set === 'function') {
+      await cache.extension.set(key, result, cache.ttl);
+    }
+
+    return result;
   }
 
   protected async refetchMutationResult(

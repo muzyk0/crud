@@ -100,12 +100,12 @@ function validateSoftDeleteConfig(fieldName: string, value: unknown, scalarField
     throw new Error(`crud-prisma: ${fieldName}.deletedValue must not be undefined`);
   }
 
-  if (typeof deletedValue !== 'function' && typeof deletedValue === 'undefined') {
-    throw new Error(`crud-prisma: ${fieldName}.deletedValue must be a value or factory`);
-  }
-
   if (!Object.prototype.hasOwnProperty.call(value, 'notDeletedValue')) {
     throw new Error(`crud-prisma: ${fieldName}.notDeletedValue must be provided`);
+  }
+
+  if (typeof value.notDeletedValue === 'undefined') {
+    throw new Error(`crud-prisma: ${fieldName}.notDeletedValue must not be undefined`);
   }
 }
 

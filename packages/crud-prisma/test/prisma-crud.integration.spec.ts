@@ -69,6 +69,9 @@ describe('#crud-prisma', () => {
 
         expect(active.body).toHaveLength(9);
         expect(all.body).toHaveLength(10);
+        expect(active.body.some((company: { id: number }) => company.id === 9)).toBe(false);
+        expect(all.body.filter((company: { deletedAt: string | null }) => !!company.deletedAt)).toHaveLength(1);
+        expect(all.body.filter((company: { id: number }) => company.id === 9)).toHaveLength(1);
         expect(all.body.some((company: { id: number }) => company.id === 9)).toBe(true);
       });
 

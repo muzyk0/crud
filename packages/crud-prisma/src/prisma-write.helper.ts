@@ -130,14 +130,77 @@ function getEntityPrimaryLookup<TModel = unknown>(
   const params = getPrismaCrudParams(parsed);
 
   return model.primaryKeys.reduce<PrismaCrudWritePayload>((lookup, key) => {
-    if (Object.prototype.hasOwnProperty.call(params, key)) {
-      lookup[key] = params[key];
-    } else if (isObject(entity) && Object.prototype.hasOwnProperty.call(entity, key)) {
+    if (isObject(entity) && Object.prototype.hasOwnProperty.call(entity, key)) {
       lookup[key] = entity[key];
+    } else if (Object.prototype.hasOwnProperty.call(params, key)) {
+      lookup[key] = params[key];
     }
 
     return lookup;
   }, {});
+}
+
+function normalizeFilterOperator(operator: QueryFilter['operator']): QueryFilter['operator'] {
+  return operator[0] === '$' ? operator : (`$${operator}` as QueryFilter['operator']);
+}
+
+function convertFilterToSearch(filter: QueryFilter): SCondition {
+  const operator = normalizeFilterOperator(filter.operator);
+  const value = operator === '$isnull' || operator === '$notnull' ? true : filter.value;
+
+  return {
+    [filter.field]: {
+      [operator]: value,
+    },
+  };
+}
+
+function isSameSearchValue(left: unknown, right: unknown): boolean {
+  if (left instanceof Date && right instanceof Date) {
+    return left.getTime() === right.getTime();
+  }
+
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return left.length === right.length && left.every((value, index) => isSameSearchValue(value, right[index]));
+  }
+
+  if (isObject(left) && isObject(right)) {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+
+    return leftKeys.length === rightKeys.length && leftKeys.every((key) => isSameSearchValue(left[key], right[key]));
+  }
+
+  return left === right;
+}
+
+function stripSearchFragments(search: SCondition | undefined, removable: SCondition[]): SCondition | undefined {
+  if (!isObject(search)) {
+    return search;
+  }
+
+  if (removable.some((fragment) => isSameSearchValue(search, fragment))) {
+    return undefined;
+  }
+
+  const next = Object.entries(search).reduce<Record<string, unknown>>((condition, [key, value]) => {
+    if ((key === '$and' || key === '$or') && Array.isArray(value)) {
+      const stripped = value
+        .map((item) => stripSearchFragments(item as SCondition, removable))
+        .filter((item): item is SCondition => !!item);
+
+      if (stripped.length) {
+        condition[key] = stripped;
+      }
+
+      return condition;
+    }
+
+    condition[key] = value;
+    return condition;
+  }, {});
+
+  return Object.keys(next).length ? (next as SCondition) : undefined;
 }
 
 function mergePrimaryLookupIntoParamsFilter(
@@ -218,20 +281,27 @@ export function clonePrismaCrudRequestWithEntity<TModel = unknown>(
   entity?: TModel | null,
 ): CrudRequest {
   const primaryLookup = getEntityPrimaryLookup(req.parsed, model, entity);
+  const primaryParamFilters = (req.parsed.paramsFilter || []).filter((filter) => model.primaryKeys.includes(filter.field));
 
   if (Object.keys(primaryLookup).length !== model.primaryKeys.length) {
     return req;
   }
 
+  const baseSearch = stripSearchFragments(
+    req.parsed.search,
+    primaryParamFilters.map(convertFilterToSearch),
+  );
+  const primarySearch = buildPrimaryLookupSearch(primaryLookup);
+
   return {
     ...req,
     parsed: {
       ...req.parsed,
-      search: req.parsed.search
+      search: baseSearch
         ? {
-            $and: [req.parsed.search, buildPrimaryLookupSearch(primaryLookup)],
+            $and: [baseSearch, primarySearch],
           }
-        : req.parsed.search,
+        : undefined,
       paramsFilter: mergePrimaryLookupIntoParamsFilter(req.parsed.paramsFilter, primaryLookup),
     },
   };

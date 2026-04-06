@@ -113,6 +113,83 @@ describe('#crud-prisma', () => {
       expect(delegate.count).toHaveBeenCalledWith({ where });
     });
 
+    it('should cache paginated getMany results when query caching is enabled', async () => {
+      const delegate = createDelegate();
+      const cache = {
+        get: jest.fn().mockResolvedValue(undefined),
+        set: jest.fn().mockResolvedValue(undefined),
+      };
+      const service = new PrismaCrudService(delegate, {
+        model: getUserModelConfig(),
+        cache,
+        query: {
+          alwaysPaginate: true,
+          cache: 120,
+        },
+      });
+      const parsed = parseQuery((qb) => qb.setLimit(2).setPage(1).sortBy({ field: 'name', order: 'ASC' }));
+      const data = [
+        { id: 1, name: 'User 1', email: '1@email.com', tenantId: 10, deletedAt: null },
+        { id: 2, name: 'User 2', email: '2@email.com', tenantId: 10, deletedAt: null },
+      ];
+
+      delegate.findMany.mockResolvedValue(data);
+      delegate.count.mockResolvedValue(4);
+
+      await expect(service.getMany(createRequest(parsed))).resolves.toEqual({
+        data,
+        count: 2,
+        total: 4,
+        page: 1,
+        pageCount: 2,
+      });
+
+      expect(cache.get).toHaveBeenCalledWith(expect.stringContaining(':many:page'));
+      expect(cache.set).toHaveBeenCalledWith(
+        expect.stringContaining(':many:page'),
+        {
+          data,
+          count: 2,
+          total: 4,
+          page: 1,
+          pageCount: 2,
+        },
+        120,
+      );
+    });
+
+    it('should honor cached getOne results before hitting the delegate', async () => {
+      const delegate = createDelegate();
+      const cached = {
+        id: 7,
+        name: 'Cached User',
+        email: 'cached@email.com',
+        tenantId: 5,
+        deletedAt: null,
+      };
+      const cache = {
+        get: jest.fn().mockResolvedValue(cached),
+        set: jest.fn(),
+      };
+      const service = new PrismaCrudService(delegate, {
+        model: getUserModelConfig(),
+        cache,
+        query: {
+          cache: 60,
+        },
+      });
+      const parsed = parseQuery((qb) => qb.select(['name']));
+
+      parsed.paramsFilter = [{ field: 'id', operator: '$eq', value: 7 }];
+
+      await expect(service.getOne(createRequest(parsed))).resolves.toEqual(cached);
+
+      expect(cache.get).toHaveBeenCalledWith(expect.stringContaining(':one'));
+      expect(delegate.findUnique).not.toHaveBeenCalled();
+      expect(delegate.findFirst).not.toHaveBeenCalled();
+      expect(cache.set).not.toHaveBeenCalled();
+    });
+
     it('should preserve pagination metadata for getMany when alwaysPaginate is enabled', async () => {
       const delegate = createDelegate();
       const service = new PrismaCrudService(delegate, {

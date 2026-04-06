@@ -78,17 +78,17 @@ function getNestedRelationSelection(
   }
 
   let currentSelect = select;
-  let currentRelationSelection: PrismaCrudRelationSelection;
+  let currentRelationSelection: PrismaCrudRelationSelection | undefined;
 
-  relationPath.forEach((relation) => {
+  for (const relation of relationPath) {
     currentRelationSelection = getPrismaRelationSelection(currentSelect, relation);
 
     if (!currentRelationSelection) {
-      return;
+      return undefined;
     }
 
     currentSelect = currentRelationSelection.select;
-  });
+  }
 
   return currentRelationSelection;
 }

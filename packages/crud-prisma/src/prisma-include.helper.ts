@@ -35,7 +35,6 @@ export interface PrismaCrudIncludePlan {
   select: PrismaCrudSelect;
   activeJoins: PrismaCrudActiveJoin[];
   aliases: Record<string, string>;
-  relationNodes: Map<string, PrismaCrudRelationSelection>;
 }
 
 function toJoinMap(joins: QueryJoin[] = []): Map<string, QueryJoin> {
@@ -201,7 +200,6 @@ export function buildPrismaIncludePlan(
   activeJoins.sort((left, right) => left.pathSegments.length - right.pathSegments.length);
 
   const select: PrismaCrudSelect = {};
-  const relationNodes = new Map<string, PrismaCrudRelationSelection>();
   const aliases: Record<string, string> = {};
 
   activeJoins.forEach((activeJoin) => {
@@ -232,13 +230,13 @@ export function buildPrismaIncludePlan(
     }
 
     let currentSelect = select;
+    let leafSelection: PrismaCrudRelationSelection | undefined;
 
     pathSegments.forEach((segment, index) => {
-      const currentPath = pathSegments.slice(0, index + 1).join('.');
       const currentRelation = relationChain[index];
       const relationSelection = ensurePrismaRelationSelection(currentSelect, segment);
 
-      relationNodes.set(currentPath, relationSelection);
+      leafSelection = relationSelection;
 
       if (index < pathSegments.length - 1 || !activeJoin.selected) {
         mergePrismaSelect(relationSelection.select, buildPrimaryKeyRelationSelect(currentRelation));
@@ -246,8 +244,6 @@ export function buildPrismaIncludePlan(
 
       currentSelect = relationSelection.select;
     });
-
-    const leafSelection = relationNodes.get(path);
 
     if (!leafSelection) {
       return;
@@ -266,6 +262,5 @@ export function buildPrismaIncludePlan(
     select,
     activeJoins,
     aliases,
-    relationNodes,
   };
 }

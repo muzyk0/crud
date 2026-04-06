@@ -27,6 +27,18 @@ function getUserModelConfig(): PrismaCrudModelConfig {
             scalarFields: ['id', 'name', 'companyId'],
             primaryKeys: ['id'],
           },
+          owner: {
+            type: 'one',
+            scalarFields: ['id', 'name'],
+            primaryKeys: ['id'],
+            relationMap: {
+              projects: {
+                type: 'many',
+                scalarFields: ['id', 'name', 'ownerId'],
+                primaryKeys: ['id'],
+              },
+            },
+          },
         },
       },
       licenses: {
@@ -342,6 +354,24 @@ describe('#crud-prisma', () => {
       ).toThrow('requires an active relation selection');
     });
 
+    it('should reject many-side nested sorting when an intermediate relation selection is missing', () => {
+      const parsed = parseQuery((qb) =>
+        qb.setJoin({ field: 'company.projects' }).sortBy({ field: 'company.owner.projects.id', order: 'DESC' }),
+      );
+
+      expect(() =>
+        mapCrudRequestToPrisma(parsed, {
+          model: getUserModelConfig(),
+          query: {
+            join: {
+              company: {},
+              'company.projects': {},
+            },
+          },
+        }),
+      ).toThrow('requires an active relation selection');
+    });
+
     it('should reject ambiguous implicit short aliases for joined relations', () => {
       const parsed = parseQuery((qb) => qb.setJoin({ field: 'company.owner' }).setJoin({ field: 'profile.owner' }));
       const model: PrismaCrudModelConfig = {
@@ -411,6 +441,52 @@ describe('#crud-prisma', () => {
       expect(result.cache.enabled).toBe(false);
       expect(result.cache.noop).toBe(true);
       expect(result.cache.note).toContain('no-op');
+    });
+
+    it.each([
+      {
+        name: '$in',
+        search: { name: { $in: 'Name2' } },
+        message: '$in expects an array value',
+      },
+      {
+        name: '$notin',
+        search: { name: { $notin: 'Name2' } },
+        message: '$notin expects an array value',
+      },
+      {
+        name: '$between',
+        search: { id: { $between: [1] } },
+        message: '$between expects exactly two values',
+      },
+      {
+        name: '$inL',
+        search: { name: { $inL: 'Name2' } },
+        message: '$inL expects an array value',
+      },
+      {
+        name: '$notinL',
+        search: { name: { $notinL: 'Name2' } },
+        message: '$notinL expects an array value',
+      },
+    ])('should reject malformed %s search values', ({ search, message }) => {
+      const parsed = parseQuery((qb) => qb.search(search as any));
+
+      expect(() =>
+        mapCrudRequestToPrisma(parsed, {
+          model: getUserModelConfig(),
+        }),
+      ).toThrow(message);
+    });
+
+    it('should reject unknown fields in search conditions', () => {
+      const parsed = parseQuery((qb) => qb.search({ missingField: { $eq: 1 } } as any));
+
+      expect(() =>
+        mapCrudRequestToPrisma(parsed, {
+          model: getUserModelConfig(),
+        }),
+      ).toThrow('unknown field "missingField"');
     });
   });
 });

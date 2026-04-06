@@ -287,6 +287,25 @@ describe('#crud-prisma', () => {
       );
     });
 
+    it('should reject bulk payloads when write normalization removes every item', async () => {
+      const delegate = createDelegate();
+      const service = new PrismaCrudService(delegate, {
+        model: getUserModelConfig({
+          write: {
+            normalizeCreate: () => undefined as any,
+          },
+        }),
+      });
+
+      await expect(
+        service.createMany(createRequest(createParsed()), {
+          bulk: [{ name: 'Removed 1' } as any, { name: 'Removed 2' } as any],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(delegate.create).not.toHaveBeenCalled();
+    });
+
     it('should create each valid bulk item after write normalization', async () => {
       const delegate = createDelegate();
       const service = new PrismaCrudService(delegate, {
@@ -580,6 +599,120 @@ describe('#crud-prisma', () => {
       expect(delegate.findUnique).not.toHaveBeenCalled();
     });
 
+    it('should refetch replaceOne with the new primary key when params override changes a route primary param', async () => {
+      const delegate = createDelegate();
+      const service = new PrismaCrudService(delegate, {
+        model: getUserModelConfig(),
+      });
+      const parsed = createParsed({
+        paramsFilter: [
+          { field: 'id', operator: '$eq', value: 11 },
+          { field: 'companyId', operator: '$eq', value: 1 },
+        ],
+        search: {
+          $and: [
+            {
+              id: {
+                $eq: 11,
+              },
+            },
+            {
+              companyId: {
+                $eq: 1,
+              },
+            },
+          ],
+        } as any,
+      });
+      const found = {
+        id: 11,
+        name: 'Before Replace',
+        email: 'before@email.com',
+        companyId: 1,
+        deletedAt: null,
+      };
+      const replaced = {
+        ...found,
+        id: 22,
+        name: 'After Replace',
+      };
+      const refetched = {
+        ...replaced,
+        company: {
+          id: 1,
+          name: 'Refetched Co',
+        },
+      };
+
+      delegate.findFirst.mockResolvedValueOnce(found).mockResolvedValueOnce(refetched);
+      delegate.update.mockResolvedValue(replaced);
+
+      await expect(
+        service.replaceOne(
+          createRequest(parsed, {
+            query: {
+              join: {
+                company: {
+                  eager: true,
+                },
+              },
+            },
+            routes: {
+              replaceOneBase: {
+                allowParamsOverride: true,
+              },
+            },
+          }),
+          {
+            id: 22,
+            name: 'After Replace',
+          },
+        ),
+      ).resolves.toEqual(refetched);
+
+      expect(delegate.update).toHaveBeenCalledWith({
+        where: {
+          id: 11,
+        },
+        data: {
+          id: 22,
+          name: 'After Replace',
+          email: 'before@email.com',
+          companyId: 1,
+          deletedAt: null,
+        },
+      });
+      expect(delegate.findFirst).toHaveBeenLastCalledWith({
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          companyId: true,
+          deletedAt: true,
+          company: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        where: {
+          AND: [
+            {
+              companyId: {
+                equals: 1,
+              },
+            },
+            {
+              id: {
+                equals: 22,
+              },
+            },
+          ],
+        },
+      });
+    });
+
     it('should refetch replaceOne updates when returnShallow is disabled', async () => {
       const delegate = createDelegate();
       const service = new PrismaCrudService(delegate, {
@@ -714,6 +847,65 @@ describe('#crud-prisma', () => {
         },
       });
       expect(delegate.delete).not.toHaveBeenCalled();
+    });
+
+    it('should include soft-deleted rows in deleteOne lookups when returnDeleted is enabled', async () => {
+      const deletedAt = new Date('2026-04-06T12:00:00.000Z');
+      const delegate = createDelegate();
+      const service = new PrismaCrudService(delegate, {
+        model: getUserModelConfig(),
+      });
+      const parsed = createParsed({
+        paramsFilter: [{ field: 'id', operator: '$eq', value: 9 }],
+      });
+      const found = {
+        id: 9,
+        name: 'Already Deleted',
+        email: 'already-deleted@email.com',
+        companyId: 3,
+        deletedAt,
+      };
+
+      delegate.findFirst.mockResolvedValue(found);
+      delegate.update.mockResolvedValue(found);
+
+      await expect(
+        service.deleteOne(
+          createRequest(parsed, {
+            query: {
+              softDelete: true,
+            },
+            routes: {
+              deleteOneBase: {
+                returnDeleted: true,
+              },
+            },
+          }),
+        ),
+      ).resolves.toEqual(found);
+
+      expect(delegate.findFirst).toHaveBeenCalledWith({
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          companyId: true,
+          deletedAt: true,
+        },
+        where: {
+          id: {
+            equals: 9,
+          },
+        },
+      });
+      expect(delegate.update).toHaveBeenCalledWith({
+        where: {
+          id: 9,
+        },
+        data: {
+          deletedAt,
+        },
+      });
     });
 
     it('should recover soft-deleted rows through explicit soft-delete config', async () => {

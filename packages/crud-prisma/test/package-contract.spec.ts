@@ -99,6 +99,19 @@ describe('#crud-prisma', () => {
         }),
       ).toThrow('softDelete.field');
     });
+
+    it('should reject soft delete configs with an undefined notDeletedValue', () => {
+      expect(() =>
+        definePrismaCrudModelConfig({
+          ...getValidModelConfig(),
+          softDelete: {
+            field: 'deletedAt',
+            deletedValue: true,
+            notDeletedValue: undefined,
+          },
+        }),
+      ).toThrow('softDelete.notDeletedValue must not be undefined');
+    });
   });
 
   describe('#definePrismaCrudOptions', () => {
