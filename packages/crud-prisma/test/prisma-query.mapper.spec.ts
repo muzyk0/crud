@@ -509,5 +509,20 @@ describe('#crud-prisma', () => {
         },
       });
     });
+
+    it('should coerce numeric-looking range values back to strings for declared string fields', () => {
+      const parsed = parseQuery((qb) => qb.setFilter({ field: 'name', operator: 'between', value: ['5', '9'] }));
+
+      const result = mapCrudRequestToPrisma(parsed, {
+        model: getUserModelConfig(),
+      });
+
+      expect(result.args.where).toEqual({
+        name: {
+          gte: '5',
+          lte: '9',
+        },
+      });
+    });
   });
 });

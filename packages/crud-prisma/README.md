@@ -44,7 +44,7 @@ Every `PrismaCrudService` receives a Prisma delegate plus explicit model config:
 
 - `modelName`: the resource name used in errors and docs.
 - `scalarFields`: every scalar field that can participate in `select`, `where`, sorting, or write normalization.
-- `stringFields`: optional string-only subset of `scalarFields` that keeps `filter`/`or` query values typed as strings for Prisma.
+- `stringFields`: optional string-only subset of `scalarFields` that keeps `filter`/`or` query values typed as strings for Prisma string operators.
 - `primaryKeys`: one or more fields used to detect direct lookups and refetch mutation results.
 - `whereUnique(params, entity)`: builds Prisma `where` input for `findUnique`, `update`, `delete`, and recover flows.
 - `relationMap`: optional relation metadata for `join`, nested `join`, required joins, and relation sorting.
@@ -172,7 +172,7 @@ export const userModel = definePrismaCrudModelConfig<User>({
 ```
 
 Use `relationMap` for `join`, nested `join`, eager relations, required joins, and nested sorting. Use `whereUnique` for single-key and compound-key lookups. Use `write` hooks only when Prisma needs explicit nested write normalization; they are the supported replacement for inferred TypeORM cascades.
-Declare `stringFields` anywhere the legacy `filter` or `or` query syntax needs numeric-looking values such as `5` to remain string filters like `"5"` when Prisma builds `equals`, `contains`, or case-insensitive string operators.
+Declare `stringFields` anywhere the legacy `filter` or `or` query syntax needs numeric-looking values such as `5` to remain string filters like `"5"` when Prisma builds string comparisons, ranges, membership checks, or case-insensitive operators.
 
 ## Route response flags
 

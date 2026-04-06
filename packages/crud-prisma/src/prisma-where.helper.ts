@@ -75,44 +75,10 @@ function coerceStringFilterValue(value: unknown): unknown {
   return `${value}`;
 }
 
-function shouldCoerceStringScalar(operator: ComparisonOperator): boolean {
-  switch (operator) {
-    case '$eq':
-    case '$ne':
-    case '$starts':
-    case '$ends':
-    case '$cont':
-    case '$excl':
-    case '$eqL':
-    case '$neL':
-    case '$startsL':
-    case '$endsL':
-    case '$contL':
-    case '$exclL':
-      return true;
-    default:
-      return false;
-  }
-}
-
-function shouldCoerceStringArray(operator: ComparisonOperator): boolean {
-  switch (operator) {
-    case '$in':
-    case '$notin':
-    case '$inL':
-    case '$notinL':
-      return true;
-    default:
-      return false;
-  }
-}
-
 function createScalarFilter(operator: ComparisonOperator, value: any, stringField = false): unknown {
   const normalizedOperator = normalizeOperator(operator);
   const normalizedValue =
-    stringField && (shouldCoerceStringScalar(normalizedOperator) || shouldCoerceStringArray(normalizedOperator))
-      ? coerceStringFilterValue(value)
-      : value;
+    stringField && normalizedOperator !== '$isnull' && normalizedOperator !== '$notnull' ? coerceStringFilterValue(value) : value;
 
   switch (normalizedOperator) {
     case '$eq':
