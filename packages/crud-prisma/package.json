@@ -36,7 +36,9 @@
     "email": "mihon4ik@gmail.com"
   },
   "scripts": {
-    "build": "npx tsc -b"
+    "build": "npx tsc -b",
+    "test": "cd ../.. && node ./node_modules/jest/bin/jest.js --config ./jest.config.js --runInBand --testPathPattern packages/crud-prisma/test",
+    "test:integration": "cd ../.. && node ./node_modules/jest/bin/jest.js --config ./jest.config.js --runInBand --testPathPattern packages/crud-prisma/test/prisma-crud.integration.spec.ts"
   },
   "dependencies": {
     "@nestjsx/crud": "^5.0.0-alpha.3",
