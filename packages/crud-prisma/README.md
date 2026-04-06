@@ -34,6 +34,7 @@ Notes:
 
 - Request-level cache settings are a no-op by default and only become active when PrismaCrudOptions.cache is provided.
 - When PrismaCrudOptions.cache is enabled, expose `get(key)` and/or `set(key, value, ttl)` so the adapter can wrap normalized Prisma args with request-scoped cache reads and writes.
+- Mutation lookups and post-write refetches bypass that cache so write paths do not reuse stale read results.
 - Join aliases remain compatibility metadata only and do not drive Prisma query generation.
 - Soft delete behavior must be declared through softDelete config rather than ORM-specific decorators.
 
@@ -177,7 +178,7 @@ Use `relationMap` for `join`, nested `join`, eager relations, required joins, an
 - `routes.deleteOneBase.returnDeleted`
 - `routes.recoverOneBase.returnRecovered`
 
-When these flags are unset, the service refetches the entity inside the current request scope when it can resolve a primary-key lookup.
+When `returnShallow` is `false`, create, update, and replace refetch the entity inside the current request scope when they can resolve a primary-key lookup. Delete and recover return a body only when `returnDeleted` or `returnRecovered` is enabled.
 
 ## Migration from @nestjsx/crud-typeorm
 

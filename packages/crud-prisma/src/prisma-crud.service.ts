@@ -88,6 +88,7 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
 
     const options = this.getRequestOptions(req);
     const create = assertPrismaCrudDelegateMethod(this.delegate, 'create');
+    const remove = assertPrismaCrudDelegateMethod(this.delegate, 'delete');
     const bulk = (
       await Promise.all(dto.bulk.map((one) => buildPrismaCrudCreateData(options.model, one as TCreate, req.parsed)))
     ).filter((one) => !!one) as TCreate[];
@@ -96,14 +97,35 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
       this.throwBadRequestException('Empty data. Nothing to save.');
     }
 
-    return Promise.all(bulk.map((data) => create({ data })));
+    const created: T[] = [];
+
+    try {
+      for (const data of bulk) {
+        created.push(await create({ data }));
+      }
+    } catch (error) {
+      // Roll back earlier inserts so a failed bulk write does not leave partial state behind.
+      for (const entity of created.slice().reverse()) {
+        try {
+          await remove({
+            where: options.model.whereUnique({}, entity),
+          });
+        } catch {
+          // Preserve the original write failure after best-effort rollback.
+        }
+      }
+
+      throw error;
+    }
+
+    return created;
   }
 
   public async updateOne(req: CrudRequest, dto: T | Partial<T>): Promise<T> {
     const options = this.getRequestOptions(req);
     const update = assertPrismaCrudDelegateMethod(this.delegate, 'update');
     const routeOptions = options.routes.updateOneBase || {};
-    const found = await this.getOneOrFail(req);
+    const found = await this.getOneOrFail(req, false, true);
     const data = await buildPrismaCrudUpdateData(
       options.model,
       found,
@@ -132,7 +154,7 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
     let found: T | null;
 
     try {
-      found = await this.getOneOrFail(req);
+      found = await this.getOneOrFail(req, false, true);
     } catch (error) {
       if (!(error instanceof NotFoundException)) {
         throw error;
@@ -172,7 +194,7 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
     const returnDeleted = !!(options.routes.deleteOneBase && options.routes.deleteOneBase.returnDeleted);
     const update = options.query.softDelete ? assertPrismaCrudDelegateMethod(this.delegate, 'update') : undefined;
     const remove = !options.query.softDelete ? assertPrismaCrudDelegateMethod(this.delegate, 'delete') : undefined;
-    const found = await this.getOneOrFail(req, returnDeleted);
+    const found = await this.getOneOrFail(req, returnDeleted, true);
     const where = await buildPrismaCrudDeleteWhere(options.model, req.parsed, found);
     const toReturn = returnDeleted ? found : undefined;
 
@@ -191,7 +213,7 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
   public async recoverOne(req: CrudRequest): Promise<void | T> {
     const options = this.getRequestOptions(req);
     const update = assertPrismaCrudDelegateMethod(this.delegate, 'update');
-    const recovered = await this.getOneOrFail(req, true);
+    const recovered = await this.getOneOrFail(req, true, true);
     const result = await update({
       where: await buildPrismaCrudRecoverWhere(options.model, req.parsed, recovered),
       data: buildPrismaCrudSoftDeleteData(options.model, 'recover'),
@@ -199,7 +221,7 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
 
     return options.routes.recoverOneBase && options.routes.recoverOneBase.returnRecovered
       ? this.refetchMutationResult(req, result, options)
-      : result;
+      : undefined;
   }
 
   protected async doGetMany(
@@ -216,14 +238,13 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
     return this.find(args);
   }
 
-  protected async getOneOrFail(req: CrudRequest, includeDeleted = false): Promise<T> {
+  protected async getOneOrFail(req: CrudRequest, includeDeleted = false, bypassCache = false): Promise<T> {
     const options = this.getRequestOptions(req);
     const parsed = includeDeleted ? { ...req.parsed, includeDeleted: 1 } : req.parsed;
     const { args, cache } = mapCrudRequestToPrisma(parsed, options);
     const uniqueArgs = this.getUniqueLookupArgs(parsed, args, options);
-    const found = await this.resolveCachedResult(cache, 'one', () =>
-      uniqueArgs ? this.delegate.findUnique(uniqueArgs) : this.findOne(args),
-    );
+    const load = () => (uniqueArgs ? this.delegate.findUnique(uniqueArgs) : this.findOne(args));
+    const found = bypassCache ? await load() : await this.resolveCachedResult(cache, 'one', load);
 
     if (!found) {
       this.throwNotFoundException(options.model.modelName);
@@ -273,7 +294,7 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
       return entity;
     }
 
-    return this.getOneOrFail(clonePrismaCrudRequestWithEntity(req, options.model, entity));
+    return this.getOneOrFail(clonePrismaCrudRequestWithEntity(req, options.model, entity), false, true);
   }
 
   protected getUniqueLookupArgs(

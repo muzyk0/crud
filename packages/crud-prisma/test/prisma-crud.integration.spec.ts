@@ -148,7 +148,7 @@ describe('#crud-prisma', () => {
         const fetched = await server.get(`/companies/${created.body.id}`).expect(200);
 
         expect(updated.body.description).toBe('updated through prisma integration');
-        expect(recovered.body.id).toBe(created.body.id);
+        expect(recovered.body).toEqual({});
         expect(fetched.body.description).toBe('updated through prisma integration');
       });
 

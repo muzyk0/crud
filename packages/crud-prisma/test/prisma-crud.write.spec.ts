@@ -341,6 +341,92 @@ describe('#crud-prisma', () => {
       });
     });
 
+    it('should roll back earlier bulk inserts when a later createMany item fails', async () => {
+      const delegate = createDelegate();
+      const service = new PrismaCrudService(delegate, {
+        model: getUserModelConfig(),
+      });
+      const created = {
+        id: 41,
+        name: 'First User',
+        email: 'first@email.com',
+        companyId: 4,
+        deletedAt: null,
+      };
+      const failure = new Error('createMany failed');
+
+      delegate.create.mockResolvedValueOnce(created).mockRejectedValueOnce(failure);
+      delegate.delete.mockResolvedValue(created);
+
+      await expect(
+        service.createMany(createRequest(createParsed()), {
+          bulk: [
+            {
+              name: 'First User',
+              email: 'first@email.com',
+              companyId: 4,
+            } as any,
+            {
+              name: 'Second User',
+              email: 'second@email.com',
+              companyId: 4,
+            } as any,
+          ],
+        }),
+      ).rejects.toBe(failure);
+
+      expect(delegate.create).toHaveBeenCalledTimes(2);
+      expect(delegate.delete).toHaveBeenCalledWith({
+        where: {
+          id: 41,
+        },
+      });
+    });
+
+    it('should bypass request cache when resolving and refetching mutation targets', async () => {
+      const delegate = createDelegate();
+      const cache = {
+        get: jest.fn().mockResolvedValue({
+          id: 5,
+          name: 'Cached User',
+          email: 'cached@email.com',
+          companyId: 3,
+          deletedAt: null,
+        }),
+        set: jest.fn(),
+      };
+      const service = new PrismaCrudService(delegate, {
+        model: getUserModelConfig(),
+        cache,
+        query: {
+          cache: 60,
+        },
+      });
+      const parsed = createParsed({
+        paramsFilter: [{ field: 'id', operator: '$eq', value: 5 }],
+      });
+      const found = {
+        id: 5,
+        name: 'Before Update',
+        email: 'before@email.com',
+        companyId: 3,
+        deletedAt: null,
+      };
+      const updated = {
+        ...found,
+        name: 'After Update',
+      };
+
+      delegate.findUnique.mockResolvedValueOnce(found).mockResolvedValueOnce(updated);
+      delegate.update.mockResolvedValue(updated);
+
+      await expect(service.updateOne(createRequest(parsed), { name: 'After Update' } as any)).resolves.toEqual(updated);
+
+      expect(cache.get).not.toHaveBeenCalled();
+      expect(cache.set).not.toHaveBeenCalled();
+      expect(delegate.findUnique).toHaveBeenCalledTimes(2);
+    });
+
     it('should use a scoped two-step lookup for updateOne and refetch inside the original scope', async () => {
       const delegate = createDelegate();
       const service = new PrismaCrudService(delegate, {
@@ -967,6 +1053,41 @@ describe('#crud-prisma', () => {
         },
       });
       expect(delegate.findFirst).toHaveBeenCalledTimes(2);
+    });
+
+    it('should return no body for recoverOne when returnRecovered is disabled', async () => {
+      const delegate = createDelegate();
+      const service = new PrismaCrudService(delegate, {
+        model: getUserModelConfig(),
+      });
+      const parsed = createParsed({
+        paramsFilter: [{ field: 'id', operator: '$eq', value: 5 }],
+      });
+      const deleted = {
+        id: 5,
+        name: 'Deleted User',
+        email: 'deleted@email.com',
+        companyId: 2,
+        deletedAt: new Date('2026-04-01T00:00:00.000Z'),
+      };
+
+      delegate.findFirst.mockResolvedValue(deleted);
+      delegate.update.mockResolvedValue({
+        ...deleted,
+        deletedAt: null,
+      });
+
+      await expect(
+        service.recoverOne(
+          createRequest(parsed, {
+            query: {
+              softDelete: true,
+            },
+          }),
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(delegate.findFirst).toHaveBeenCalledTimes(1);
     });
 
     it('should preserve not-found semantics for replaceOne target resolution errors', async () => {
