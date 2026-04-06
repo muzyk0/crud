@@ -11,6 +11,9 @@
         "name": "crud-request"
       },
       {
+        "name": "crud-prisma"
+      },
+      {
         "name": "crud-typeorm"
       },
       {
