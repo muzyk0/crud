@@ -15,6 +15,22 @@ export interface PrismaCrudFindUniqueArgs {
   select: PrismaCrudQueryArgs['select'];
 }
 
+export interface PrismaCrudCreateArgs<TData = unknown> {
+  data: TData;
+  select?: PrismaCrudQueryArgs['select'];
+}
+
+export interface PrismaCrudUpdateArgs<TData = unknown> {
+  where: PrismaCrudWhereUniqueInput;
+  data: TData;
+  select?: PrismaCrudQueryArgs['select'];
+}
+
+export interface PrismaCrudDeleteArgs {
+  where: PrismaCrudWhereUniqueInput;
+  select?: PrismaCrudQueryArgs['select'];
+}
+
 export interface PrismaCrudCountArgs {
   where?: PrismaCrudWhere;
 }
@@ -24,7 +40,12 @@ export interface PrismaCrudDelegate<TModel = unknown> {
   findFirst(args?: PrismaCrudFindOneArgs): Promise<TModel | null>;
   findUnique?(args: PrismaCrudFindUniqueArgs): Promise<TModel | null>;
   count(args?: PrismaCrudCountArgs): Promise<number>;
+  create?(args: PrismaCrudCreateArgs): Promise<TModel>;
+  update?(args: PrismaCrudUpdateArgs): Promise<TModel>;
+  delete?(args: PrismaCrudDeleteArgs): Promise<TModel>;
 }
+
+type PrismaCrudMutationMethod = 'create' | 'update' | 'delete';
 
 export type PrismaCrudServiceOptions<TModel = unknown, TCreate = Partial<TModel>, TUpdate = Partial<TModel>> = Pick<
   PrismaCrudOptions<TModel, TCreate, TUpdate>,
@@ -56,6 +77,17 @@ export function assertPrismaCrudDelegate<TModel = unknown>(
   }
 
   return delegate;
+}
+
+export function assertPrismaCrudDelegateMethod<TModel = unknown, TMethod extends PrismaCrudMutationMethod = PrismaCrudMutationMethod>(
+  delegate: PrismaCrudDelegate<TModel>,
+  method: TMethod,
+): NonNullable<PrismaCrudDelegate<TModel>[TMethod]> {
+  if (!delegate || typeof delegate[method] !== 'function') {
+    throw new Error(`crud-prisma: delegate must expose ${method}() for mutation operations`);
+  }
+
+  return delegate[method] as NonNullable<PrismaCrudDelegate<TModel>[TMethod]>;
 }
 
 export function mergePrismaCrudOptions<TModel = unknown, TCreate = Partial<TModel>, TUpdate = Partial<TModel>>(
