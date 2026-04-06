@@ -8,6 +8,7 @@ function getCompanyModelConfig(): PrismaCrudModelConfig<Company> {
   return {
     modelName: 'Company',
     scalarFields: ['id', 'name', 'domain', 'description', 'deletedAt'],
+    stringFields: ['name', 'domain', 'description'],
     primaryKeys: ['id'],
     softDelete: {
       field: 'deletedAt',

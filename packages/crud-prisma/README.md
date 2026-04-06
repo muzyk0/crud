@@ -44,6 +44,7 @@ Every `PrismaCrudService` receives a Prisma delegate plus explicit model config:
 
 - `modelName`: the resource name used in errors and docs.
 - `scalarFields`: every scalar field that can participate in `select`, `where`, sorting, or write normalization.
+- `stringFields`: optional string-only subset of `scalarFields` that keeps `filter`/`or` query values typed as strings for Prisma.
 - `primaryKeys`: one or more fields used to detect direct lookups and refetch mutation results.
 - `whereUnique(params, entity)`: builds Prisma `where` input for `findUnique`, `update`, `delete`, and recover flows.
 - `relationMap`: optional relation metadata for `join`, nested `join`, required joins, and relation sorting.
@@ -62,6 +63,7 @@ import { Company } from './company.model';
 const companyModel = definePrismaCrudModelConfig<Company>({
   modelName: 'Company',
   scalarFields: ['id', 'name', 'domain', 'description', 'deletedAt'],
+  stringFields: ['name', 'domain', 'description'],
   primaryKeys: ['id'],
   softDelete: {
     field: 'deletedAt',
@@ -124,16 +126,19 @@ import { User } from './user.model';
 export const userModel = definePrismaCrudModelConfig<User>({
   modelName: 'User',
   scalarFields: ['id', 'email', 'isActive', 'companyId', 'profileId', 'nameFirst', 'nameLast', 'deletedAt'],
+  stringFields: ['email', 'nameFirst', 'nameLast'],
   primaryKeys: ['id'],
   relationMap: {
     company: {
       type: 'one',
       scalarFields: ['id', 'name', 'domain', 'description', 'deletedAt'],
+      stringFields: ['name', 'domain', 'description'],
       primaryKeys: ['id'],
       relationMap: {
         projects: {
           type: 'many',
           scalarFields: ['id', 'name', 'description', 'isActive', 'companyId'],
+          stringFields: ['name', 'description'],
           primaryKeys: ['id'],
         },
       },
@@ -167,6 +172,7 @@ export const userModel = definePrismaCrudModelConfig<User>({
 ```
 
 Use `relationMap` for `join`, nested `join`, eager relations, required joins, and nested sorting. Use `whereUnique` for single-key and compound-key lookups. Use `write` hooks only when Prisma needs explicit nested write normalization; they are the supported replacement for inferred TypeORM cascades.
+Declare `stringFields` anywhere the legacy `filter` or `or` query syntax needs numeric-looking values such as `5` to remain string filters like `"5"` when Prisma builds `equals`, `contains`, or case-insensitive string operators.
 
 ## Route response flags
 

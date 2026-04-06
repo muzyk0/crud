@@ -15,26 +15,31 @@ function getUserModelConfig(): PrismaCrudModelConfig {
   return {
     modelName: 'User',
     scalarFields: ['id', 'name', 'email', 'tenantId', 'deletedAt'],
+    stringFields: ['name', 'email'],
     primaryKeys: ['id'],
     relationMap: {
       company: {
         type: 'one',
         scalarFields: ['id', 'name', 'updatedAt'],
+        stringFields: ['name'],
         primaryKeys: ['id'],
         relationMap: {
           projects: {
             type: 'many',
             scalarFields: ['id', 'name', 'companyId'],
+            stringFields: ['name'],
             primaryKeys: ['id'],
           },
           owner: {
             type: 'one',
             scalarFields: ['id', 'name'],
+            stringFields: ['name'],
             primaryKeys: ['id'],
             relationMap: {
               projects: {
                 type: 'many',
                 scalarFields: ['id', 'name', 'ownerId'],
+                stringFields: ['name'],
                 primaryKeys: ['id'],
               },
             },
@@ -44,11 +49,13 @@ function getUserModelConfig(): PrismaCrudModelConfig {
       licenses: {
         type: 'many',
         scalarFields: ['id', 'key'],
+        stringFields: ['key'],
         primaryKeys: ['id'],
       },
       profile: {
         type: 'one',
         scalarFields: ['id', 'bio'],
+        stringFields: ['bio'],
         primaryKeys: ['id'],
       },
     },
@@ -162,7 +169,7 @@ describe('#crud-prisma', () => {
                     company: {
                       is: {
                         name: {
-                          contains: 5,
+                          contains: '5',
                         },
                       },
                     },
@@ -487,6 +494,20 @@ describe('#crud-prisma', () => {
           model: getUserModelConfig(),
         }),
       ).toThrow('unknown field "missingField"');
+    });
+
+    it('should coerce numeric-looking filter values back to strings for declared string fields', () => {
+      const parsed = parseQuery((qb) => qb.setFilter({ field: 'name', operator: 'eq', value: '5' }));
+
+      const result = mapCrudRequestToPrisma(parsed, {
+        model: getUserModelConfig(),
+      });
+
+      expect(result.args.where).toEqual({
+        name: {
+          equals: '5',
+        },
+      });
     });
   });
 });

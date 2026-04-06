@@ -68,11 +68,13 @@ function getUserModelConfig(
   return {
     modelName: 'User',
     scalarFields: ['id', 'name', 'email', 'companyId', 'deletedAt'],
+    stringFields: ['name', 'email'],
     primaryKeys: ['id'],
     relationMap: {
       company: {
         type: 'one',
         scalarFields: ['id', 'name'],
+        stringFields: ['name'],
         primaryKeys: ['id'],
       },
     },

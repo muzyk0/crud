@@ -23,6 +23,7 @@ export interface PrismaCrudResolvedField {
   relationPath: string[];
   relationChain: PrismaCrudRelationConfig[];
   relation?: PrismaCrudRelationConfig;
+  stringField: boolean;
 }
 
 export interface PrismaCrudActiveJoin extends PrismaCrudResolvedRelationPath {
@@ -122,6 +123,7 @@ export function resolvePrismaField(
       field: segments[0],
       relationPath: [],
       relationChain: [],
+      stringField: !!(model.stringFields || []).includes(segments[0]),
     };
   }
 
@@ -143,6 +145,7 @@ export function resolvePrismaField(
     relationPath: resolvedPath.pathSegments,
     relationChain: resolvedPath.relationChain,
     relation: resolvedPath.relation,
+    stringField: !!(resolvedPath.relation.stringFields || []).includes(targetField),
   };
 }
 

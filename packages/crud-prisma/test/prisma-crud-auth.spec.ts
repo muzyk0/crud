@@ -64,6 +64,7 @@ function getProjectModelConfig(): PrismaCrudModelConfig<ProjectRecord> {
   return {
     modelName: 'Project',
     scalarFields: ['id', 'name', 'description', 'companyId'],
+    stringFields: ['name', 'description'],
     primaryKeys: ['id'],
     whereUnique: (params, entity) => ({ id: entity && entity.id ? entity.id : params.id }),
   };
@@ -73,6 +74,7 @@ function getUserModelConfig(): PrismaCrudModelConfig<UserRecord> {
   return {
     modelName: 'User',
     scalarFields: ['id', 'email', 'isActive'],
+    stringFields: ['email'],
     primaryKeys: ['id'],
     whereUnique: (params, entity) => ({ id: entity && entity.id ? entity.id : params.id }),
   };

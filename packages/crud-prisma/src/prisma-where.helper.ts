@@ -59,76 +59,130 @@ function wrapFieldCondition(
   return fragment;
 }
 
-function createScalarFilter(operator: ComparisonOperator, value: any): unknown {
-  switch (normalizeOperator(operator)) {
+function coerceStringFilterValue(value: unknown): unknown {
+  if (typeof value === 'undefined' || value === null) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => coerceStringFilterValue(item));
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  return `${value}`;
+}
+
+function shouldCoerceStringScalar(operator: ComparisonOperator): boolean {
+  switch (operator) {
     case '$eq':
-      return { equals: value };
     case '$ne':
-      return { not: value };
-    case '$gt':
-      return { gt: value };
-    case '$lt':
-      return { lt: value };
-    case '$gte':
-      return { gte: value };
-    case '$lte':
-      return { lte: value };
     case '$starts':
-      return { startsWith: value };
     case '$ends':
-      return { endsWith: value };
     case '$cont':
-      return { contains: value };
     case '$excl':
-      return { not: { contains: value } };
+    case '$eqL':
+    case '$neL':
+    case '$startsL':
+    case '$endsL':
+    case '$contL':
+    case '$exclL':
+      return true;
+    default:
+      return false;
+  }
+}
+
+function shouldCoerceStringArray(operator: ComparisonOperator): boolean {
+  switch (operator) {
     case '$in':
-      if (!Array.isArray(value)) {
+    case '$notin':
+    case '$inL':
+    case '$notinL':
+      return true;
+    default:
+      return false;
+  }
+}
+
+function createScalarFilter(operator: ComparisonOperator, value: any, stringField = false): unknown {
+  const normalizedOperator = normalizeOperator(operator);
+  const normalizedValue =
+    stringField && (shouldCoerceStringScalar(normalizedOperator) || shouldCoerceStringArray(normalizedOperator))
+      ? coerceStringFilterValue(value)
+      : value;
+
+  switch (normalizedOperator) {
+    case '$eq':
+      return { equals: normalizedValue };
+    case '$ne':
+      return { not: normalizedValue };
+    case '$gt':
+      return { gt: normalizedValue };
+    case '$lt':
+      return { lt: normalizedValue };
+    case '$gte':
+      return { gte: normalizedValue };
+    case '$lte':
+      return { lte: normalizedValue };
+    case '$starts':
+      return { startsWith: normalizedValue };
+    case '$ends':
+      return { endsWith: normalizedValue };
+    case '$cont':
+      return { contains: normalizedValue };
+    case '$excl':
+      return { not: { contains: normalizedValue } };
+    case '$in':
+      if (!Array.isArray(normalizedValue)) {
         throw new Error('crud-prisma: $in expects an array value');
       }
 
-      return { in: value };
+      return { in: normalizedValue };
     case '$notin':
-      if (!Array.isArray(value)) {
+      if (!Array.isArray(normalizedValue)) {
         throw new Error('crud-prisma: $notin expects an array value');
       }
 
-      return { notIn: value };
+      return { notIn: normalizedValue };
     case '$isnull':
       return { equals: null };
     case '$notnull':
       return { not: null };
     case '$between':
-      if (!Array.isArray(value) || value.length !== 2) {
+      if (!Array.isArray(normalizedValue) || normalizedValue.length !== 2) {
         throw new Error('crud-prisma: $between expects exactly two values');
       }
 
-      return { gte: value[0], lte: value[1] };
+      return { gte: normalizedValue[0], lte: normalizedValue[1] };
     case '$eqL':
-      return { equals: value, mode: 'insensitive' };
+      return { equals: normalizedValue, mode: 'insensitive' };
     case '$neL':
-      return { not: { equals: value, mode: 'insensitive' } };
+      return { not: { equals: normalizedValue, mode: 'insensitive' } };
     case '$startsL':
-      return { startsWith: value, mode: 'insensitive' };
+      return { startsWith: normalizedValue, mode: 'insensitive' };
     case '$endsL':
-      return { endsWith: value, mode: 'insensitive' };
+      return { endsWith: normalizedValue, mode: 'insensitive' };
     case '$contL':
-      return { contains: value, mode: 'insensitive' };
+      return { contains: normalizedValue, mode: 'insensitive' };
     case '$exclL':
-      return { not: { contains: value, mode: 'insensitive' } };
+      return { not: { contains: normalizedValue, mode: 'insensitive' } };
     case '$inL':
-      if (!Array.isArray(value)) {
+      if (!Array.isArray(normalizedValue)) {
         throw new Error('crud-prisma: $inL expects an array value');
       }
 
-      return { in: value, mode: 'insensitive' };
+      return { in: normalizedValue, mode: 'insensitive' };
     case '$notinL':
-      if (!Array.isArray(value)) {
+      if (!Array.isArray(normalizedValue)) {
         throw new Error('crud-prisma: $notinL expects an array value');
       }
 
-      return { notIn: value, mode: 'insensitive' };
+      return { notIn: normalizedValue, mode: 'insensitive' };
     default:
-      return { equals: value };
+      return { equals: normalizedValue };
   }
 }
 
@@ -143,7 +197,12 @@ function mapFieldSearch(
 
   if (!isObject(value)) {
     const operator = value === null ? '$isnull' : '$eq';
-    return wrapFieldCondition(relationPathOrEmpty(resolvedField), relationTypes, resolvedField.field, createScalarFilter(operator, value));
+    return wrapFieldCondition(
+      relationPathOrEmpty(resolvedField),
+      relationTypes,
+      resolvedField.field,
+      createScalarFilter(operator, value, resolvedField.stringField),
+    );
   }
 
   const fragments = Object.entries(value).reduce<PrismaCrudWhere[]>((acc, [operator, operatorValue]) => {
@@ -158,7 +217,7 @@ function mapFieldSearch(
             relationPathOrEmpty(resolvedField),
             relationTypes,
             resolvedField.field,
-            createScalarFilter(orOperator as ComparisonOperator, orValue),
+            createScalarFilter(orOperator as ComparisonOperator, orValue, resolvedField.stringField),
           ),
         )
         .filter((fragment) => hasKeys(fragment));
@@ -176,7 +235,7 @@ function mapFieldSearch(
         relationPathOrEmpty(resolvedField),
         relationTypes,
         resolvedField.field,
-        createScalarFilter(operator as ComparisonOperator, operatorValue),
+        createScalarFilter(operator as ComparisonOperator, operatorValue, resolvedField.stringField),
       ),
     );
 

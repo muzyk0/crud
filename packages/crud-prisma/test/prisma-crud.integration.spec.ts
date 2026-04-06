@@ -75,6 +75,17 @@ describe('#crud-prisma', () => {
         expect(all.body.some((company: { id: number }) => company.id === 9)).toBe(true);
       });
 
+      it('should preserve numeric-looking filter values for string fields', async () => {
+        const query = buildQuery((qb) => qb.setOr({ field: 'domain', operator: 'cont', value: 5 }));
+        const res = await server.get('/companies').query(query).expect(200);
+
+        expect(res.body).toHaveLength(1);
+        expect(res.body[0]).toMatchObject({
+          id: 5,
+          domain: 'Domain5',
+        });
+      });
+
       it('should load joins with excluded fields on the top-level users route', async () => {
         const query = buildQuery((qb) => qb.setJoin({ field: 'company' }).setJoin({ field: 'company.projects' }));
         const res = await server.get('/users/1').query(query).expect(200);

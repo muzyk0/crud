@@ -11,6 +11,7 @@ export interface PrismaCrudSoftDeleteConfig {
 export interface PrismaCrudRelationConfig {
   type: PrismaCrudRelationType;
   scalarFields: string[];
+  stringFields?: string[];
   primaryKeys?: string[];
   relationMap?: PrismaCrudRelationMap;
   alias?: string;
@@ -42,6 +43,7 @@ export interface PrismaCrudWriteHooks<TModel = unknown, TCreate = Partial<TModel
 export interface PrismaCrudModelConfig<TModel = unknown, TCreate = Partial<TModel>, TUpdate = Partial<TModel>> {
   modelName: string;
   scalarFields: string[];
+  stringFields?: string[];
   relationMap?: PrismaCrudRelationMap;
   primaryKeys: string[];
   softDelete?: PrismaCrudSoftDeleteConfig;
@@ -135,6 +137,12 @@ function validateRelationMap(fieldName: string, relationMap: unknown): void {
       throw new Error(`crud-prisma: ${relationFieldName}.alias must be a non-empty string when provided`);
     }
 
+    if (typeof relationConfig.stringFields !== 'undefined') {
+      const stringFields = assertStringArray(`${relationFieldName}.stringFields`, relationConfig.stringFields);
+
+      assertSubset(`${relationFieldName}.stringFields`, stringFields, `${relationFieldName}.scalarFields`, scalarFields);
+    }
+
     if (typeof relationConfig.primaryKeys !== 'undefined') {
       const primaryKeys = assertStringArray(`${relationFieldName}.primaryKeys`, relationConfig.primaryKeys);
 
@@ -162,6 +170,12 @@ export function validatePrismaCrudModelConfig<TModel = unknown, TCreate = Partia
   const primaryKeys = assertStringArray('primaryKeys', config.primaryKeys);
 
   assertSubset('primaryKeys', primaryKeys, 'scalarFields', scalarFields);
+
+  if (typeof config.stringFields !== 'undefined') {
+    const stringFields = assertStringArray('stringFields', config.stringFields);
+
+    assertSubset('stringFields', stringFields, 'scalarFields', scalarFields);
+  }
 
   if (typeof config.whereUnique !== 'function') {
     throw new Error('crud-prisma: whereUnique must be a function');

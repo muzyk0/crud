@@ -36,11 +36,13 @@ function getCompanyModelConfig(): PrismaCrudModelConfig<CompanyRecord> {
   return definePrismaCrudModelConfig<CompanyRecord>({
     modelName: 'Company',
     scalarFields: ['id', 'name', 'domain', 'description', 'deletedAt'],
+    stringFields: ['name', 'domain', 'description'],
     primaryKeys: ['id'],
     relationMap: {
       projects: {
         type: 'many',
         scalarFields: ['id', 'name', 'description', 'isActive', 'companyId'],
+        stringFields: ['name', 'description'],
         primaryKeys: ['id'],
       },
     },
@@ -67,6 +69,7 @@ describe('#crud-prisma', () => {
       expect(readme).toContain('@nestjsx/crud-prisma');
       expect(readme).toContain('PrismaCrudService');
       expect(readme).toContain('definePrismaCrudModelConfig');
+      expect(readme).toContain('stringFields');
       expect(readme).toContain('whereUnique');
       expect(readme).toContain('relationMap');
       expect(readme).toContain('normalizeCreate');
@@ -173,6 +176,7 @@ describe('#crud-prisma', () => {
       expect(prismaPage).toContain('returnShallow');
       expect(prismaPage).toContain('returnRecovered');
       expect(prismaPage).toContain('allowParamsOverride');
+      expect(prismaPage).toContain('stringFields');
       expect(prismaPage).toContain('PrismaCrudOptions.cache');
       expect(prismaPage).toContain('get(key)');
       expect(prismaPage).toContain('set(key, value, ttl)');

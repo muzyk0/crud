@@ -8,11 +8,13 @@ function getCompanyRelationConfig(): PrismaCrudRelationConfig {
   return {
     type: 'one',
     scalarFields: ['id', 'name', 'domain', 'description', 'deletedAt'],
+    stringFields: ['name', 'domain', 'description'],
     primaryKeys: ['id'],
     relationMap: {
       projects: {
         type: 'many',
         scalarFields: ['id', 'name', 'description', 'isActive', 'companyId'],
+        stringFields: ['name', 'description'],
         primaryKeys: ['id'],
       },
     },
@@ -23,17 +25,20 @@ function getUserModelConfig(): PrismaCrudModelConfig<User> {
   return {
     modelName: 'User',
     scalarFields: ['id', 'email', 'isActive', 'companyId', 'profileId', 'nameFirst', 'nameLast', 'deletedAt'],
+    stringFields: ['email', 'nameFirst', 'nameLast'],
     primaryKeys: ['id'],
     relationMap: {
       company: getCompanyRelationConfig(),
       profile: {
         type: 'one',
         scalarFields: ['id', 'name', 'deletedAt'],
+        stringFields: ['name'],
         primaryKeys: ['id'],
       },
       projects: {
         type: 'many',
         scalarFields: ['id', 'name', 'description', 'isActive', 'companyId'],
+        stringFields: ['name', 'description'],
         primaryKeys: ['id'],
       },
     },

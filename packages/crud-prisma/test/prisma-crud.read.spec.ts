@@ -43,16 +43,19 @@ function getUserModelConfig(): PrismaCrudModelConfig<UserRecord> {
   return {
     modelName: 'User',
     scalarFields: ['id', 'name', 'email', 'tenantId', 'deletedAt'],
+    stringFields: ['name', 'email'],
     primaryKeys: ['id'],
     relationMap: {
       company: {
         type: 'one',
         scalarFields: ['id', 'name', 'updatedAt'],
+        stringFields: ['name'],
         primaryKeys: ['id'],
         relationMap: {
           projects: {
             type: 'many',
             scalarFields: ['id', 'name', 'companyId'],
+            stringFields: ['name'],
             primaryKeys: ['id'],
           },
         },

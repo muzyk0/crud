@@ -8,6 +8,7 @@ function getProjectModelConfig(): PrismaCrudModelConfig<Project> {
   return {
     modelName: 'Project',
     scalarFields: ['id', 'name', 'description', 'isActive', 'companyId'],
+    stringFields: ['name', 'description'],
     primaryKeys: ['id'],
     whereUnique: (params, entity) => ({
       id: Number(entity && entity.id ? entity.id : params.id),

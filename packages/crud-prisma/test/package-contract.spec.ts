@@ -16,16 +16,19 @@ function getValidModelConfig(): PrismaCrudModelConfig<CompanyRecord> {
   return {
     modelName: 'Company',
     scalarFields: ['companyId', 'name', 'deletedAt'],
+    stringFields: ['name'],
     primaryKeys: ['companyId'],
     relationMap: {
       projects: {
         type: 'many',
         scalarFields: ['projectId', 'title', 'companyId'],
+        stringFields: ['title'],
         primaryKeys: ['projectId'],
         relationMap: {
           owner: {
             type: 'one',
             scalarFields: ['userId', 'email'],
+            stringFields: ['email'],
             primaryKeys: ['userId'],
             alias: 'projectOwner',
           },
@@ -73,6 +76,15 @@ describe('#crud-prisma', () => {
           primaryKeys: ['missingField'],
         }),
       ).toThrow('primaryKeys');
+    });
+
+    it('should reject string fields that are not declared in scalarFields', () => {
+      expect(() =>
+        definePrismaCrudModelConfig({
+          ...getValidModelConfig(),
+          stringFields: ['missingField'],
+        }),
+      ).toThrow('stringFields');
     });
 
     it('should reject dotted relation names and invalid soft delete fields', () => {
