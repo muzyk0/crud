@@ -1,9 +1,4 @@
 <div align="center">
-  <h1>:point_right:<a href="https://github.com/nestjsx/crud/issues/784">You can help NestJs CRUD
-  </a></h1>
-</div>
-
-<div align="center">
   <h1>CRUD</h1>
 </div>
 <div align="center">
