@@ -86,16 +86,20 @@ We believe that everyone who's working with NestJs and building some RESTful ser
 
 ## Packages
 
-- [**@nestjsx/crud**](https://www.npmjs.com/package/@nestjsx/crud) - core package which provides `@Crud()` decorator for endpoints generation, global configuration, validation, helper decorators ([docs](https://github.com/nestjsx/crud/wiki/Controllers#description))
-- [**@nestjsx/crud-request**](https://www.npmjs.com/package/@nestjsx/crud-request) - request builder/parser package which provides `RequestQueryBuilder` class for a frontend usage and `RequestQueryParser` that is being used internally for handling and validating query/path params on a backend side ([docs](https://github.com/nestjsx/crud/wiki/Requests#frontend-usage))
-- [**@nestjsx/crud-typeorm**](https://www.npmjs.com/package/@nestjsx/crud-typeorm) - TypeORM package which provides base `TypeOrmCrudService` with methods for CRUD database operations ([docs](https://github.com/nestjsx/crud/wiki/ServiceTypeorm))
+- [**@nestjsx/crud**](https://www.npmjs.com/package/@nestjsx/crud) - core package which provides `@Crud()` decorator for endpoints generation, global configuration, validation, helper decorators ([docs](https://github.com/muzyk0/crud/wiki/Controllers#description))
+- [**@nestjsx/crud-request**](https://www.npmjs.com/package/@nestjsx/crud-request) - request builder/parser package which provides `RequestQueryBuilder` class for a frontend usage and `RequestQueryParser` that is being used internally for handling and validating query/path params on a backend side ([docs](https://github.com/muzyk0/crud/wiki/Requests#frontend-usage))
+- [**@nestjsx/crud-typeorm**](https://www.npmjs.com/package/@nestjsx/crud-typeorm) - TypeORM package which provides base `TypeOrmCrudService` with methods for CRUD database operations ([docs](https://github.com/muzyk0/crud/wiki/ServiceTypeorm))
+- [**@nestjsx/crud-prisma**](packages/crud-prisma/README.md) - Prisma package which provides `PrismaCrudService` with explicit model metadata so existing `@Crud()` controllers can keep their routes and request parsing ([docs](https://github.com/muzyk0/crud/wiki/ServicePrisma))
 
 ## Documentation
 
 - :dart: [General Information](https://github.com/nestjsx/crud/wiki#why)
-- :video_game: [CRUD Controllers](https://github.com/nestjsx/crud/wiki/Controllers#description)
-- :horse_racing: [CRUD ORM Services](https://github.com/nestjsx/crud/wiki/Services#description)
-- :trumpet: [Handling Requests](https://github.com/nestjsx/crud/wiki/Requests#description)
+- :video_game: [CRUD Controllers](https://github.com/muzyk0/crud/wiki/Controllers#description)
+- :horse_racing: [CRUD ORM Services](https://github.com/muzyk0/crud/wiki/Services#description)
+- :rocket: [CRUD Prisma Service](https://github.com/muzyk0/crud/wiki/ServicePrisma#description)
+- :trumpet: [Handling Requests](https://github.com/muzyk0/crud/wiki/Requests#description)
+
+The Prisma adapter is designed for service-by-service migration from `@nestjsx/crud-typeorm`: keep the controller layer, move ORM-specific behavior into explicit Prisma model config, and add write hooks only where nested writes need normalization.
 
 ## Support
 

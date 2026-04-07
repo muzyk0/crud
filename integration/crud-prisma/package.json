@@ -1,0 +1,16 @@
+{
+  "name": "crud-prisma-integration",
+  "private": true,
+  "scripts": {
+    "prisma:generate": "DATABASE_URL=file:./dev.db node ./node_modules/prisma/build/index.js generate --schema ./prisma/schema.prisma",
+    "db:push": "DATABASE_URL=file:./dev.db node ./node_modules/prisma/build/index.js db push --force-reset --accept-data-loss --schema ./prisma/schema.prisma",
+    "db:seed": "DATABASE_URL=file:./dev.db node ../../node_modules/ts-node/dist/bin.js -T -r ../../node_modules/tsconfig-paths/register ./prisma/seed.ts",
+    "db:prepare": "npm run prisma:generate && npm run db:push && npm run db:seed"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3"
+  },
+  "devDependencies": {
+    "prisma": "6.19.3"
+  }
+}

@@ -4,7 +4,7 @@ import { CrudConfigService } from '@nestjsx/crud';
 import { USER_REQUEST_KEY } from './constants';
 
 // Important: load config before (!!!) you import AppModule
-// https://github.com/nestjsx/crud/wiki/Controllers#global-options
+// https://github.com/muzyk0/crud/wiki/Controllers#global-options
 CrudConfigService.load({
   auth: {
     property: USER_REQUEST_KEY,
