@@ -88,7 +88,8 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
 
     const options = this.getRequestOptions(req);
     const create = assertPrismaCrudDelegateMethod(this.delegate, 'create');
-    const remove = assertPrismaCrudDelegateMethod(this.delegate, 'delete');
+    const remove =
+      typeof this.delegate.delete === 'function' ? this.delegate.delete.bind(this.delegate) : undefined;
     const bulk = (
       await Promise.all(dto.bulk.map((one) => buildPrismaCrudCreateData(options.model, one as TCreate, req.parsed)))
     ).filter((one) => !!one) as TCreate[];
@@ -104,14 +105,16 @@ export class PrismaCrudService<T, TCreate = Partial<T>, TUpdate = Partial<T>> ex
         created.push(await create({ data }));
       }
     } catch (error) {
-      // Roll back earlier inserts so a failed bulk write does not leave partial state behind.
-      for (const entity of created.slice().reverse()) {
-        try {
-          await remove({
-            where: options.model.whereUnique({}, entity),
-          });
-        } catch {
-          // Preserve the original write failure after best-effort rollback.
+      if (remove) {
+        // Roll back earlier inserts so a failed bulk write does not leave partial state behind.
+        for (const entity of created.slice().reverse()) {
+          try {
+            await remove({
+              where: options.model.whereUnique({}, entity),
+            });
+          } catch {
+            // Preserve the original write failure after best-effort rollback.
+          }
         }
       }
 

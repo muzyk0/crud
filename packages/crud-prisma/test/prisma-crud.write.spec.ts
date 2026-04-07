@@ -343,6 +343,48 @@ describe('#crud-prisma', () => {
       });
     });
 
+    it('should allow successful createMany calls without a delete delegate', async () => {
+      const delegate = {
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        count: jest.fn(),
+        create: jest.fn(),
+      };
+      const service = new PrismaCrudService(delegate, {
+        model: getUserModelConfig(),
+      });
+      const created = {
+        id: 51,
+        name: 'Create Only User',
+        email: 'create-only@email.com',
+        companyId: 4,
+        deletedAt: null,
+      };
+
+      delegate.create.mockResolvedValue(created);
+
+      await expect(
+        service.createMany(createRequest(createParsed()), {
+          bulk: [
+            {
+              name: 'Create Only User',
+              email: 'create-only@email.com',
+              companyId: 4,
+            } as any,
+          ],
+        }),
+      ).resolves.toEqual([created]);
+
+      expect(delegate.create).toHaveBeenCalledWith({
+        data: {
+          name: 'Create Only User',
+          email: 'create-only@email.com',
+          companyId: 4,
+        },
+      });
+    });
+
     it('should roll back earlier bulk inserts when a later createMany item fails', async () => {
       const delegate = createDelegate();
       const service = new PrismaCrudService(delegate, {
