@@ -1,0 +1,50 @@
+{
+  "name": "@nestjsx/crud-prisma",
+  "description": "NestJs CRUD for RESTful APIs - Prisma",
+  "version": "5.0.0-alpha.3",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "lib"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nestjsx/crud.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nestjsx/crud/issues"
+  },
+  "keywords": [
+    "typescript",
+    "prisma",
+    "nest",
+    "nestjs",
+    "rest",
+    "restful",
+    "api",
+    "crud",
+    "crud-generator",
+    "backend",
+    "frameworks"
+  ],
+  "author": {
+    "name": "Michael Yali",
+    "email": "mihon4ik@gmail.com"
+  },
+  "scripts": {
+    "build": "npx tsc -b",
+    "test": "cd ../.. && node ./node_modules/jest/bin/jest.js --config ./jest.config.js --runInBand --testPathPattern packages/crud-prisma/test",
+    "test:integration": "cd ../.. && node ./node_modules/jest/bin/jest.js --config ./jest.config.js --runInBand --testPathPattern packages/crud-prisma/test/prisma-crud.integration.spec.ts"
+  },
+  "dependencies": {
+    "@nestjsx/crud": "^5.0.0-alpha.3",
+    "@nestjsx/crud-request": "^5.0.0-alpha.3"
+  },
+  "peerDependencies": {
+    "@prisma/client": "*"
+  }
+}

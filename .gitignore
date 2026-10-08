@@ -17,6 +17,8 @@ lerna-debug.log
 # tests
 /coverage
 /.nyc_output
+/integration/crud-prisma/package-lock.json
+/integration/crud-prisma/prisma/**/*.db
 
 # dist
 packages/**/lib

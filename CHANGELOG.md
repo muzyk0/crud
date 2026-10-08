@@ -151,7 +151,7 @@
 
 ### BREAKING CHANGES
 
-- **crud:** changed `CrudOptions` ([docs](https://github.com/nestjsx/crud/wiki/Controllers#options))
+- **crud:** changed `CrudOptions` ([docs](https://github.com/muzyk0/crud/wiki/Controllers#options))
 - **crud:** remove decorators: `@ParsedOptions`, `@ParsedParams`, `@ParsedQuery`. Add decorator `@ParsedRequest` instead.
 - **crud:** change interfaces
 - **services:** remove `RestfulOptions` from services
@@ -162,9 +162,9 @@
 - **repo:** refactor to monorepository
 - **docs:** new [documentation](https://github.com/nestjsx/crud/wiki)
 - **packages:** totally refactor `@nestjsx/crud` to be service (ORM) agnostic
-- **packages:** add `@nestjsx/crud-typeorm` ([docs](https://github.com/nestjsx/crud/wiki/ServiceTypeorm))
-- **packages:** add `@nestjsx/crud-request` ([docs](https://github.com/nestjsx/crud/wiki/Requests#description), [#53])
-- **crud:** add global options ([docs](https://github.com/nestjsx/crud/wiki/Controllers#global-options), [#64])
+- **packages:** add `@nestjsx/crud-typeorm` ([docs](https://github.com/muzyk0/crud/wiki/ServiceTypeorm))
+- **packages:** add `@nestjsx/crud-request` ([docs](https://github.com/muzyk0/crud/wiki/Requests#description), [#53])
+- **crud:** add global options ([docs](https://github.com/muzyk0/crud/wiki/Controllers#global-options), [#64])
 - **crud:** add eager relations option ([#54], [#67])
 
 ### Bug Fixes
